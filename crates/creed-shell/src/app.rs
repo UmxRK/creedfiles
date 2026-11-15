@@ -1383,6 +1383,19 @@ impl App {
                 "config_error": self.config_error,
             })
             .to_string(),
+            "export-wallpaper" => {
+                let out = std::path::PathBuf::from(arg);
+                let (w, h) = self.output_size(self.focused_output().as_ref());
+                let scale = self.output_state.outputs().next().and_then(|o| self.output_state.info(&o)).map(|i| i.scale_factor.max(1)).unwrap_or(1) as u32;
+                if arg.is_empty() || !out.is_absolute() {
+                    "error: export-wallpaper needs an absolute path".into()
+                } else {
+                    match views::wallpaper::export_png(&self.theme, &self.paths, w * scale, h * scale, &out) {
+                        Ok(()) => "ok".into(),
+                        Err(e) => format!("error: {e}"),
+                    }
+                }
+            }
             "quit" => {
                 self.exit = true;
                 "bye".into()

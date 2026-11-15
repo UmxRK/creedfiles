@@ -1,0 +1,67 @@
+# Windows 10 look-alike: left taskbar, Acrylic, square corners, tiled Start, Action Center.
+
+[meta]
+name = "Windows 10"
+family = "windows"
+description = "Classic left-aligned taskbar with a search box, Acrylic blur, square corners, the tiled Start menu and a full-height Action Center."
+preview = "preview.png"
+
+[appearance]
+wallpaper = "creed://ribbon"
+color_source = "preset"
+motion = "smooth"
+font = "Inter"
+
+[bar]
+position = "bottom"
+style = "edge"
+size = 40
+margin = 0
+radius = 0
+left = ["launcher", "search", "taskview", "taskbar"]
+center = []
+right = ["tray", "network", "volume", "battery", "keyboard", "clock", "notifications"]
+clock_format = "%H:%M"
+date_format = "%d/%m/%Y"
+
+[dock]
+enabled = false
+
+[glass]
+refraction = 0.2
+roughness = 0.3
+thickness = 10
+frost = 0.7
+specular = 0.0
+blur_size = 14
+blur_passes = 3
+
+[notifications]
+position = "bottom-right"
+
+[style]
+radius = 0
+radius_small = 0
+spacing = 4
+padding = 12
+border_width = 1
+shadow = 0.3
+material = "acrylic"
+window_mode = "float"
+titlebar = "windows"
+icon_theme = "Fluent-dark"
+cursor_theme = "Adwaita"
+gtk_theme = "adw-gtk3-dark"
+palette = "windows10"
+bar = "win10"
+dock = "none"
+launcher = "start10"
+control = "win10"
+overview = "taskview"
+dashboard = "widgets11"
+notifications = "win10"
+osd = "win10"
+window_gaps_in = 3
+window_gaps_out = 6
+window_rounding = 0
+window_border = 1

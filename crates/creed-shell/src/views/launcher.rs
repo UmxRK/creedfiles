@@ -277,7 +277,7 @@ fn draw_start11(ui: &mut Ui, t: f64, data: &Data, views: &mut Views) {
     let (input_r, rest) = inner.take_top(36.0, 24.0);
     let pre = views.preedit.clone();
     ui.input(ui::id("launcher.input"), input_r, &views.query, "Search for apps, settings, and documents", true, &pre);
-    let (body, footer) = rest.take_bottom(56.0, 12.0);
+    let (footer, body) = rest.take_bottom(56.0, 12.0);
     if views.query.is_empty() {
         let (hd, grid) = body.take_top(28.0, 8.0);
         super::heading(ui, hd, "Pinned");

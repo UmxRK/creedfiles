@@ -75,6 +75,10 @@ pub struct General {
     pub file_manager: String,
     pub browser: String,
     pub locale_24h: bool,
+    /// Theme Firefox (userChrome.css) along with the mode.
+    pub theme_browser: bool,
+    /// Keyboard layout passed to Hyprland (empty = detect from the system).
+    pub kb_layout: String,
 }
 impl Default for General {
     fn default() -> Self {
@@ -85,6 +89,8 @@ impl Default for General {
             file_manager: "thunar".into(),
             browser: "firefox".into(),
             locale_24h: true,
+            theme_browser: true,
+            kb_layout: String::new(),
         }
     }
 }

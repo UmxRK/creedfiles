@@ -1,0 +1,6 @@
+-- Your Hyprland settings. Creed never overwrites this file.
+-- Anything here wins over Creed's generated config. Examples:
+--
+-- hl.monitor({ output = "DP-1", mode = "2560x1440@165", position = "0x0", scale = 1 })
+-- hl.config({ input = { kb_layout = "us,de", kb_options = "grp:alt_shift_toggle" } })
+-- hl.bind("SUPER + B", hl.dsp.exec_cmd("firefox"))

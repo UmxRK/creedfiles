@@ -1,0 +1,71 @@
+# Mac OS X "Aqua" look-alike: pinstripes, gloss and the shelf dock.
+
+[meta]
+name = "Classic Aqua"
+family = "macos"
+description = "Early-2000s Aqua: pinstriped menu bar, glossy highlights, the reflective shelf dock and lickable blue accents. Pure nostalgia."
+preview = "preview.png"
+
+[appearance]
+wallpaper = "creed://aqua"
+color_source = "preset"
+scheme = "light"
+motion = "smooth"
+font = "Inter"
+
+[bar]
+position = "top"
+style = "edge"
+size = 24
+margin = 0
+radius = 0
+left = ["launcher", "appmenu"]
+center = []
+right = ["tray", "battery", "network", "volume", "clock", "search"]
+clock_format = "%H:%M"
+date_format = "%a %d %b"
+
+[dock]
+enabled = true
+position = "bottom"
+icon_size = 48
+magnify = 1.6
+margin = 4
+
+[glass]
+enabled = true
+frost = 0.95
+specular = 0.0
+blur_size = 6
+blur_passes = 2
+
+[notifications]
+position = "top-right"
+
+[style]
+radius = 8
+radius_small = 5
+spacing = 6
+padding = 10
+border_width = 1
+shadow = 0.35
+material = "aqua"
+window_mode = "float"
+titlebar = "mac"
+icon_theme = "WhiteSur"
+cursor_theme = "Adwaita"
+gtk_theme = "adw-gtk3"
+palette = "aqua"
+scheme = "light"
+bar = "aqua"
+dock = "aqua"
+launcher = "aqua"
+control = "aqua"
+overview = "mission"
+dashboard = "mac"
+notifications = "mac"
+osd = "mac"
+window_gaps_in = 5
+window_gaps_out = 8
+window_rounding = 8
+window_border = 0

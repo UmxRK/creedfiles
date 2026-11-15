@@ -202,6 +202,46 @@ fn draw_procedural_inner(cr: &Context, name: &str, w: f64, h: f64, dark: bool) {
     }
 }
 
+/// Renders the current wallpaper to a PNG (used for the lock screen).
+pub fn export_png(th: &crate::gfx::Theme, paths: &Paths, w: u32, h: u32, out: &std::path::Path) -> Result<(), String> {
+    let surf = cairo::ImageSurface::create(cairo::Format::Rgb24, w as i32, h as i32).map_err(|e| e.to_string())?;
+    {
+        let cr = Context::new(&surf).map_err(|e| e.to_string())?;
+        let wp = th.cfg.appearance.wallpaper.clone();
+        let name = if wp.is_empty() { Some(default_for(th).to_string()) } else { wp.strip_prefix("creed://").map(str::to_string) };
+        match name {
+            Some(n) => draw_procedural(&cr, &n, w as f64, h as f64, th.dark),
+            None => match load_cover(&paths.expand(&wp), w, h) {
+                Some(img) => {
+                    let _ = cr.set_source_surface(&img, 0.0, 0.0);
+                    let _ = cr.paint();
+                }
+                None => draw_procedural(&cr, default_for(th), w as f64, h as f64, th.dark),
+            },
+        }
+    }
+    let tmp = out.with_extension("tmp.png");
+    let mut f = std::fs::File::create(&tmp).map_err(|e| e.to_string())?;
+    surf.write_to_png(&mut f).map_err(|e| e.to_string())?;
+    std::fs::rename(&tmp, out).map_err(|e| e.to_string())?;
+    drop(surf);
+    crate::trim_memory();
+    Ok(())
+}
+
+fn default_for(th: &crate::gfx::Theme) -> &'static str {
+    match th.cfg.style.bar.as_str() {
+        "win11" => "bloom",
+        "win10" => "ribbon",
+        "aqua" => "aqua",
+        "mac" => match th.cfg.style.material {
+            creed_core::config::Material::Glass => "horizon",
+            _ => "dunes",
+        },
+        _ => "dawn",
+    }
+}
+
 pub fn draw(ui: &mut Ui, paths: &Paths) {
     let (w, h) = ui.size;
     let cr = ui.cr;

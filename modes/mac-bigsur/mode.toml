@@ -1,0 +1,70 @@
+# macOS 11–13 (Big Sur → Ventura) look-alike: softer, brighter, light by default.
+
+[meta]
+name = "macOS Big Sur"
+family = "macos"
+description = "The bright, rounded Big Sur era: light appearance, translucent menu bar, roomy dock with gentle magnification."
+preview = "preview.png"
+
+[appearance]
+wallpaper = "creed://aurora"
+color_source = "preset"
+scheme = "light"
+motion = "smooth"
+font = "Inter"
+
+[bar]
+position = "top"
+style = "edge"
+size = 26
+margin = 0
+radius = 0
+left = ["launcher", "appmenu"]
+center = []
+right = ["tray", "battery", "network", "control", "search", "clock"]
+clock_format = "%H:%M"
+date_format = "%a %d %b"
+
+[dock]
+enabled = true
+position = "bottom"
+icon_size = 46
+magnify = 1.35
+margin = 6
+
+[glass]
+frost = 0.66
+specular = 0.25
+blur_size = 10
+blur_passes = 3
+
+[notifications]
+position = "top-right"
+
+[style]
+radius = 12
+radius_small = 7
+spacing = 8
+padding = 12
+border_width = 1
+shadow = 0.18
+material = "frost"
+window_mode = "float"
+titlebar = "mac"
+icon_theme = "WhiteSur"
+cursor_theme = "Adwaita"
+gtk_theme = "adw-gtk3"
+palette = "macos"
+scheme = "light"
+bar = "mac"
+dock = "mac"
+launcher = "spotlight"
+control = "mac"
+overview = "mission"
+dashboard = "mac"
+notifications = "mac"
+osd = "mac"
+window_gaps_in = 6
+window_gaps_out = 10
+window_rounding = 10
+window_border = 0

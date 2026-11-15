@@ -38,7 +38,15 @@ pub fn draw(ui: &mut Ui, closing: bool, data: &Data, views: &mut Views) {
     th.panel(ui.cr, panel, radius, "control", ui.pointer);
     ui.record("control.panel", panel, None);
     ui.hit(ui::id("control.panel"), panel, Action::None, Role::Group, "");
-    let inner = panel.inset(16.0);
+    let mut inner = panel.inset(16.0);
+    if variant == "win10" && views.page == 0 {
+        // Action Center: notifications fill the top, quick actions sit at the bottom.
+        let main_h = main_height(ui, data, &variant) - 32.0;
+        let (top, bottom) = inner.take_bottom(main_h, 12.0);
+        let (bottom, top) = (top, bottom);
+        notif_list(ui, top, data, views);
+        inner = bottom;
+    }
     match views.page {
         1 => wifi_page(ui, inner, data, views),
         2 => bt_page(ui, inner, data),
@@ -113,7 +121,7 @@ fn main_page(ui: &mut Ui, inner: Rect, data: &Data, variant: &str) {
         o => o,
     }
     .to_string();
-    ui.toggle_tile(ui::id("cc.power"), r3[1], "power-profile-balanced-symbolic", "Power mode", &pretty, prof == "performance", Action::Page(3));
+    ui.toggle_tile(ui::id("cc.power"), r3[1], "power-profile-balanced-symbolic", "Power", &pretty, prof == "performance", Action::Page(3));
     y += tile + if data.audio.is_some() || data.mic.is_some() || data.brightness.is_some() { 18.0 } else { 8.0 };
 
     // Sliders
@@ -278,4 +286,25 @@ fn power_page(ui: &mut Ui, r: Rect, data: &Data) {
         let rr = Rect::new(rest.x, rest.y + i as f64 * 56.0, rest.w, 52.0);
         ui.row(ui::idn("cc.prof", i), rr, Some(&format!("power-profile-{id}-symbolic")), title, sub, cur == *id, Action::PowerProfile(id.to_string()));
     }
+}
+
+fn notif_list(ui: &mut Ui, area: Rect, data: &Data, views: &mut Views) {
+    let th = ui.th;
+    let (hdr, list) = area.take_top(30.0, 8.0);
+    ui.text(hdr, "Notifications", &Text::new(th.fs * 1.1, th.pal.text).bold());
+    if data.history.is_empty() {
+        super::empty(ui, list, "notifications-symbolic", "No new notifications");
+        return;
+    }
+    let from = ui.hits.len();
+    let rows = super::list_layout(views, list, data.history.len(), 64.0, 6.0);
+    super::with_clip(ui, list, |ui| {
+        for (i, r) in rows {
+            let n = &data.history[i];
+            let body = super::notif::strip_markup(&n.body);
+            let icon = if n.icon.is_empty() { "dialog-information-symbolic".to_string() } else { n.icon.clone() };
+            ui.row(ui::idn("ac.n", n.id), r, Some(&icon), &n.summary, &body, false, Action::NotifDismiss(n.id));
+        }
+    });
+    super::clip_hits(ui, from, list);
 }

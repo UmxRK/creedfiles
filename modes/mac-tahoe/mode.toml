@@ -1,0 +1,79 @@
+# macOS 26 "Tahoe" look-alike: Liquid Glass everywhere.
+
+[meta]
+name = "macOS Tahoe"
+family = "macos"
+description = "Liquid Glass: clear, refractive bar, dock and panels with a moving edge highlight. Tune refraction, frost, tint and shine in Settings → Glass."
+preview = "preview.png"
+
+[appearance]
+wallpaper = "creed://horizon"
+color_source = "preset"
+motion = "expressive"
+font = "Inter"
+
+[bar]
+position = "top"
+style = "floating"
+size = 30
+margin = 6
+radius = 15
+left = ["launcher", "appmenu"]
+center = []
+right = ["tray", "media", "battery", "network", "control", "search", "clock"]
+clock_format = "%H:%M"
+date_format = "%a %d %b"
+
+[dock]
+enabled = true
+position = "bottom"
+icon_size = 50
+magnify = 1.55
+margin = 8
+
+[glass]
+refraction = 0.55
+thickness = 14
+roughness = 0.08
+frost = 0.32
+specular = 0.55
+specular_follow_cursor = true
+tint = "#ffffff10"
+blur_size = 6
+blur_passes = 3
+
+[glass.elements.bar]
+frost = 0.22
+
+[glass.elements.notifications]
+frost = 0.55
+
+[notifications]
+position = "top-right"
+
+[style]
+radius = 22
+radius_small = 12
+spacing = 8
+padding = 12
+border_width = 0
+shadow = 0.25
+material = "glass"
+window_mode = "float"
+titlebar = "mac"
+icon_theme = "WhiteSur-dark"
+cursor_theme = "Adwaita"
+gtk_theme = "adw-gtk3-dark"
+palette = "macos"
+bar = "mac"
+dock = "mac"
+launcher = "spotlight"
+control = "mac"
+overview = "mission"
+dashboard = "mac"
+notifications = "mac"
+osd = "mac"
+window_gaps_in = 6
+window_gaps_out = 10
+window_rounding = 18
+window_border = 0

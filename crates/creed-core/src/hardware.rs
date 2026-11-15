@@ -15,6 +15,8 @@ pub enum GpuVendor {
 
 #[derive(Clone, Debug, PartialEq, Serialize)]
 pub struct Gpu {
+    /// DRM card node name, e.g. `card1`.
+    pub card: String,
     pub vendor: GpuVendor,
     pub driver: String,
     pub pci: String,
@@ -81,7 +83,7 @@ impl Hardware {
                 .unwrap_or_else(|| name.clone());
             let boot_vga = read(dev.join("boot_vga")) == "1";
             if !gpus.iter().any(|g: &Gpu| g.pci == pci) {
-                gpus.push(Gpu { vendor, driver, pci, boot_vga });
+                gpus.push(Gpu { card: name.clone(), vendor, driver, pci, boot_vga });
             }
         }
 
@@ -253,6 +255,7 @@ mod tests {
         assert!(h.is_hybrid());
         assert_eq!(h.primary_gpu().unwrap().vendor, GpuVendor::Intel);
         assert_eq!(h.gpus[1].driver, "nvidia");
+        assert_eq!(h.gpus[1].card, "card1");
         assert!(h.is_laptop && h.has_battery && h.root_btrfs && h.has_ssd && !h.has_hdd);
         assert_eq!(h.cores, 2);
         assert_eq!(h.ram_mb, 15921);

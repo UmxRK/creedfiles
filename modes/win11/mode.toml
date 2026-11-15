@@ -1,0 +1,65 @@
+# Windows 11 look-alike: centred taskbar, Mica, rounded corners, Snap Layouts.
+
+[meta]
+name = "Windows 11"
+family = "windows"
+description = "Centred taskbar, Mica material, rounded windows, Start with pinned apps, Snap Layouts (Win+Z) and Widgets (Win+W). Windows float like on Windows."
+preview = "preview.png"
+
+[appearance]
+wallpaper = "creed://bloom"
+color_source = "preset"
+motion = "smooth"
+font = "Inter"
+
+[bar]
+position = "bottom"
+style = "edge"
+size = 48
+margin = 0
+radius = 0
+left = ["widgets"]
+center = ["launcher", "search", "taskview", "taskbar"]
+right = ["tray", "network", "volume", "battery", "clock", "notifications"]
+clock_format = "%H:%M"
+date_format = "%d/%m/%Y"
+
+[dock]
+enabled = false
+
+[glass]
+refraction = 0.0
+frost = 0.84
+specular = 0.0
+blur_size = 12
+blur_passes = 4
+
+[notifications]
+position = "bottom-right"
+
+[style]
+radius = 8
+radius_small = 4
+spacing = 6
+padding = 12
+border_width = 1
+shadow = 0.28
+material = "mica"
+window_mode = "float"
+titlebar = "windows"
+icon_theme = "Fluent-dark"
+cursor_theme = "Adwaita"
+gtk_theme = "adw-gtk3-dark"
+palette = "windows11"
+bar = "win11"
+dock = "none"
+launcher = "start11"
+control = "win11"
+overview = "taskview"
+dashboard = "widgets11"
+notifications = "win11"
+osd = "win11"
+window_gaps_in = 4
+window_gaps_out = 8
+window_rounding = 8
+window_border = 1

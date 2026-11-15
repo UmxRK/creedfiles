@@ -398,6 +398,9 @@ name = "creed"
 version = "0.1.0"
 dependencies = [
  "creed-core",
+ "libc",
+ "serde_json",
+ "toml 0.8.23",
 ]
 
 [[package]]

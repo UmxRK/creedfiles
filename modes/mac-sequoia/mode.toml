@@ -1,0 +1,68 @@
+# macOS 14–15 (Sonoma / Sequoia) look-alike: frosted vibrancy.
+
+[meta]
+name = "macOS Sequoia"
+family = "macos"
+description = "Frosted vibrancy menu bar, magnifying dock, Control Center and Mission Control - the modern Mac look before Liquid Glass."
+preview = "preview.png"
+
+[appearance]
+wallpaper = "creed://dunes"
+color_source = "preset"
+motion = "smooth"
+font = "Inter"
+
+[bar]
+position = "top"
+style = "edge"
+size = 28
+margin = 0
+radius = 0
+left = ["launcher", "appmenu"]
+center = []
+right = ["tray", "media", "battery", "network", "control", "search", "clock"]
+clock_format = "%H:%M"
+date_format = "%a %d %b"
+
+[dock]
+enabled = true
+position = "bottom"
+icon_size = 48
+magnify = 1.45
+margin = 6
+
+[glass]
+frost = 0.7
+specular = 0.2
+blur_size = 10
+blur_passes = 3
+
+[notifications]
+position = "top-right"
+
+[style]
+radius = 14
+radius_small = 8
+spacing = 8
+padding = 12
+border_width = 1
+shadow = 0.25
+material = "frost"
+window_mode = "float"
+titlebar = "mac"
+icon_theme = "WhiteSur-dark"
+cursor_theme = "Adwaita"
+gtk_theme = "adw-gtk3-dark"
+palette = "macos"
+bar = "mac"
+dock = "mac"
+launcher = "spotlight"
+control = "mac"
+overview = "mission"
+dashboard = "mac"
+notifications = "mac"
+osd = "mac"
+window_gaps_in = 6
+window_gaps_out = 10
+window_rounding = 12
+window_border = 0

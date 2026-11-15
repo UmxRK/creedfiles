@@ -177,7 +177,7 @@ fn sys_card(ui: &mut Ui, r: Rect, data: &Data) {
     };
     let cols = cells;
     let row = |c: &Rect| {
-        let side = (c.w).min(c.h);
+        let side = c.w.min(c.h).min(132.0);
         Rect::new(c.x, c.y + (c.h - side) / 2.0, c.w, side)
     };
     let mem = if s.mem_total_mb > 0 { s.mem_used_mb as f64 / s.mem_total_mb as f64 } else { 0.0 };

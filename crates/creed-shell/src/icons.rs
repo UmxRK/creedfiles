@@ -42,8 +42,8 @@ impl Icons {
         for d in data_dirs.split(':').filter(|d| !d.is_empty()) {
             bases.push(PathBuf::from(d).join("icons"));
         }
-        Icons {
-            theme: theme.to_string(),
+        let mut me = Icons {
+            theme: String::new(),
             bases,
             themes: HashMap::new(),
             paths: HashMap::new(),
@@ -51,12 +51,29 @@ impl Icons {
             order: VecDeque::new(),
             scale: 1.0,
             cap: 160,
+        };
+        me.theme = me.resolve_theme(theme);
+        me
+    }
+
+    fn installed(&self, theme: &str) -> bool {
+        self.bases.iter().any(|b| b.join(theme).join("index.theme").is_file())
+    }
+
+    /// Uses `theme` if installed, otherwise the closest installed fallback.
+    pub fn resolve_theme(&self, theme: &str) -> String {
+        if self.installed(theme) {
+            return theme.to_string();
         }
+        let light = !theme.to_lowercase().contains("dark");
+        let candidates: &[&str] = if light { &["Papirus", "Papirus-Light", "Adwaita"] } else { &["Papirus-Dark", "Papirus", "Adwaita"] };
+        candidates.iter().find(|c| self.installed(c)).map(|c| c.to_string()).unwrap_or_else(|| "hicolor".into())
     }
 
     pub fn set_theme(&mut self, theme: &str) {
+        let theme = self.resolve_theme(theme);
         if theme != self.theme {
-            self.theme = theme.to_string();
+            self.theme = theme;
             self.paths.clear();
             self.clear();
         }

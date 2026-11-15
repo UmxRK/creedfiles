@@ -156,9 +156,16 @@ pub fn draw(ui: &mut Ui, data: &Data, views: &mut Views) {
             ui.th.hover_bg(ui.cr, dr.inset(-4.0), th.radius_small(), hv);
         }
         if id == "__apps" {
-            let tile = dr.inset(sz * 0.06);
-            gfx::fill_rounded(ui.cr, tile, tile.w * 0.26, th.pal.accent.with_alpha(0.18));
-            ui.icon(tile, ic, (sz * 0.5).round(), Some(th.pal.accent));
+            // Looks like an app icon: accent squircle with a soft top light.
+            let tile = dr.inset(sz * 0.07);
+            gfx::fill_rounded(ui.cr, tile, tile.w * 0.27, th.pal.accent);
+            let g = cairo::LinearGradient::new(0.0, tile.y, 0.0, tile.bottom());
+            g.add_color_stop_rgba(0.0, 1.0, 1.0, 1.0, 0.22);
+            g.add_color_stop_rgba(0.6, 1.0, 1.0, 1.0, 0.0);
+            gfx::rounded(ui.cr, tile, tile.w * 0.27);
+            let _ = ui.cr.set_source(&g);
+            let _ = ui.cr.fill();
+            ui.icon(tile, ic, (sz * 0.46).round(), Some(th.pal.on_accent));
             let target = if variant == "mac" || variant == "aqua" { Kind::Overview } else { Kind::Launcher };
             ui.hit(k, r, if target == Kind::Overview { Action::Exec("creed toggle launchpad".into()) } else { Action::Toggle(target) }, Role::Button, "Applications");
         } else {
