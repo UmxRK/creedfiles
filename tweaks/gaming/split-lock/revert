@@ -1,0 +1,2 @@
+. "$CREED_TWEAK_DIR/../../lib.sh"
+run sysctl -w kernel.split_lock_mitigate=1

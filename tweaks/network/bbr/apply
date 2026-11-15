@@ -1,0 +1,12 @@
+. "$CREED_TWEAK_DIR/../../lib.sh"
+put /etc/modules-load.d/creed-bbr.conf <<'X'
+# Creed: BBR congestion control
+tcp_bbr
+X
+put /etc/sysctl.d/80-creed-bbr.conf <<'X'
+# Creed: BBR + fq
+net.core.default_qdisc = fq
+net.ipv4.tcp_congestion_control = bbr
+X
+run modprobe tcp_bbr
+run sysctl --system

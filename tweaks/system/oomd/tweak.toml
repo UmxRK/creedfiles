@@ -1,0 +1,10 @@
+title = "Out-of-memory protection (systemd-oomd)"
+explain = """
+When memory is nearly full, systemd-oomd stops the single runaway program instead of
+letting the whole desktop freeze for minutes. Recommended on machines with less than
+16 GB of RAM.
+"""
+recommend = "ram<16384"
+requires = ["systemctl"]
+privileged = true
+risk = "low"

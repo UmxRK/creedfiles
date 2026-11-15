@@ -1,0 +1,9 @@
+title = "USB autosuspend"
+explain = """
+Lets idle USB devices (card readers, webcams, Bluetooth adapters) sleep to save power.
+Keyboards and mice are excluded because some of them lag after sleeping.
+"""
+touches = ["/etc/udev/rules.d/62-creed-usb-autosuspend.rules"]
+available = "laptop"
+privileged = true
+risk = "medium"

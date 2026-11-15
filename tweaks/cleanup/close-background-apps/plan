@@ -1,0 +1,8 @@
+. "$CREED_TWEAK_DIR/../../lib.sh"
+for p in discord Discord vesktop slack teams-for-linux telegram-desktop signal-desktop element-desktop spotify steam steamwebhelper dropbox onedrive megasync zoom whatsapp-for-linux; do
+  pids=$(pgrep -u "$(id -u)" -x "$p" 2>/dev/null || true)
+  [ -z "$pids" ] && continue
+  kb=$(for i in $pids; do awk '/^Pss:/{print $2}' /proc/$i/smaps_rollup 2>/dev/null; done | awk '{s+=$1} END {print s+0}')
+  echo "  $p - $((kb / 1024)) MB"
+done
+true

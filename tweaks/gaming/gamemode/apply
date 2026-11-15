@@ -1,0 +1,14 @@
+. "$CREED_TWEAK_DIR/../../lib.sh"
+mkdir -p "$HOME/.config"
+cat > "$HOME/.config/gamemode.ini" <<'X'
+; Creed GameMode settings
+[general]
+renice=10
+softrealtime=auto
+inhibit_screensaver=1
+desiredgov=performance
+defaultgov=powersave
+
+[gpu]
+apply_gpu_optimisations=0
+X

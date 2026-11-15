@@ -1,0 +1,7 @@
+. "$CREED_TWEAK_DIR/../../lib.sh"
+put /etc/NetworkManager/conf.d/99-creed-ipv6-privacy.conf <<'X'
+# Creed: temporary IPv6 addresses
+[connection]
+ipv6.ip6-privacy = 2
+X
+run nmcli general reload

@@ -1,0 +1,13 @@
+title = "Compressed RAM swap (zram)"
+explain = """
+Creates a compressed swap area in RAM (zstd, up to half your memory, at most 8 GB) and
+tunes the kernel to use it well. When memory runs low, idle pages are compressed instead
+of the system freezing or writing to disk. Very effective on 4 to 16 GB machines.
+Takes effect after a reboot.
+"""
+touches = ["/etc/systemd/zram-generator.conf", "/etc/sysctl.d/80-creed-zram.conf"]
+recommend = "always"
+requires = ["/usr/lib/systemd/system-generators/zram-generator"]
+privileged = true
+needs_reboot = true
+risk = "low"

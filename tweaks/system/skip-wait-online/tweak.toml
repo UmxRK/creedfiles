@@ -1,0 +1,10 @@
+title = "Boot without waiting for the network"
+explain = """
+Disables NetworkManager-wait-online, which can add several seconds to every boot while
+the system waits for a connection. The desktop does not need it; only setups with
+network drives mounted at boot do (leave this off if you use those).
+"""
+recommend = "always"
+requires = ["systemctl"]
+privileged = true
+risk = "low"

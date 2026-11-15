@@ -1,0 +1,9 @@
+title = "Remove orphaned packages"
+explain = """
+Removes packages that were installed only as dependencies of something you have since
+uninstalled. The list below is exactly what will be removed.
+"""
+requires = ["pacman"]
+privileged = true
+destructive = true
+risk = "medium"

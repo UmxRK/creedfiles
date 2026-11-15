@@ -1,0 +1,7 @@
+. "$CREED_TWEAK_DIR/../../lib.sh"
+put /etc/systemd/journald.conf.d/creed-size.conf <<'X'
+# Creed: keep logs small
+[Journal]
+SystemMaxUse=200M
+X
+run systemctl restart systemd-journald

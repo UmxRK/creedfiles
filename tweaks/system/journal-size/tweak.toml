@@ -1,0 +1,9 @@
+title = "Cap the system log at 200 MB"
+explain = """
+The systemd journal can grow to gigabytes over time. This caps it at 200 MB; older
+entries are dropped first. Recent logs for troubleshooting are kept.
+"""
+touches = ["/etc/systemd/journald.conf.d/creed-size.conf"]
+recommend = "always"
+privileged = true
+risk = "low"

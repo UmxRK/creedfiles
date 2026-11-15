@@ -1,0 +1,9 @@
+title = "IPv6 privacy addresses"
+explain = """
+Makes NetworkManager use temporary, changing IPv6 addresses for outgoing connections so
+websites cannot follow your device by its address. No effect on IPv4-only networks.
+"""
+touches = ["/etc/NetworkManager/conf.d/99-creed-ipv6-privacy.conf"]
+recommend = "always"
+privileged = true
+risk = "low"

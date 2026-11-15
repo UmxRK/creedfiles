@@ -1,0 +1,2 @@
+. "$CREED_TWEAK_DIR/../../lib.sh"
+run udevadm control --reload

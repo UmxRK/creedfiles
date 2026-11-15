@@ -1,0 +1,2 @@
+. "$CREED_TWEAK_DIR/../../lib.sh"
+live && has hyprctl && hyprctl reload >/dev/null 2>&1 || true

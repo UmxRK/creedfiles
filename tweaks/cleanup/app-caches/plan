@@ -1,0 +1,9 @@
+. "$CREED_TWEAK_DIR/../../lib.sh"
+total=0
+for d in "$HOME/.cache/thumbnails" "$HOME/.cache/mesa_shader_cache" "$HOME/.cache/mesa_shader_cache_db" "$HOME/.cache/mozilla/firefox"/*/cache2 "$HOME/.cache/chromium/Default/Cache" "$HOME/.cache/google-chrome/Default/Cache" "$HOME/.config"/*/Cache "$HOME/.config"/*/"Code Cache" "$HOME/.config"/*/GPUCache; do
+  [ -d "$d" ] || continue
+  s=$(du_b "$d"); [ "$s" -gt 0 ] || continue
+  total=$((total + s)); echo "  $(human $s)  ${d/#$HOME/~}"
+done
+[ "$total" -gt 0 ] && echo "  Total: $(human $total)"
+true

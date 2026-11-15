@@ -1,0 +1,6 @@
+. "$CREED_TWEAK_DIR/../../lib.sh"
+put /etc/sysctl.d/80-creed-split-lock.conf <<'X'
+# Creed: no split-lock penalty for games
+kernel.split_lock_mitigate = 0
+X
+run sysctl --system

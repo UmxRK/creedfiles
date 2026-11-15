@@ -1,0 +1,7 @@
+. "$CREED_TWEAK_DIR/../../lib.sh"
+put /etc/NetworkManager/conf.d/99-creed-wifi-powersave.conf <<'X'
+# Creed: keep Wi-Fi awake (2 = power saving off)
+[connection]
+wifi.powersave = 2
+X
+run nmcli general reload

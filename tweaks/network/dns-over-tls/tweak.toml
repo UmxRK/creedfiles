@@ -1,0 +1,11 @@
+title = "Encrypted DNS (DNS-over-TLS)"
+explain = """
+Sends DNS lookups encrypted to Cloudflare (1.1.1.1) and Quad9 (9.9.9.9) through
+systemd-resolved, so the network you are on cannot read or change the names you look
+up. It uses opportunistic mode: if a network blocks encrypted DNS it falls back instead
+of leaving you offline. It only works when systemd-resolved is your resolver.
+"""
+touches = ["/etc/systemd/resolved.conf.d/creed-dot.conf"]
+requires = ["resolvectl"]
+privileged = true
+risk = "medium"

@@ -1,0 +1,10 @@
+title = "Release cached memory"
+explain = """
+Writes pending data to disk and asks the kernel to drop its file cache and compact
+memory, so free memory is immediately available (handy right before starting a big
+game). Nothing is deleted; the cache simply refills as you use the system.
+"""
+requires = ["sync"]
+privileged = true
+destructive = true
+risk = "low"

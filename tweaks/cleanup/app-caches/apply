@@ -1,0 +1,5 @@
+. "$CREED_TWEAK_DIR/../../lib.sh"
+for d in "$HOME/.cache/thumbnails" "$HOME/.cache/mesa_shader_cache" "$HOME/.cache/mesa_shader_cache_db" "$HOME/.cache/mozilla/firefox"/*/cache2 "$HOME/.cache/chromium/Default/Cache" "$HOME/.cache/google-chrome/Default/Cache" "$HOME/.config"/*/Cache "$HOME/.config"/*/"Code Cache" "$HOME/.config"/*/GPUCache; do
+  [ -d "$d" ] && rm -rf -- "$d"
+done
+true

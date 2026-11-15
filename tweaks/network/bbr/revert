@@ -1,0 +1,3 @@
+. "$CREED_TWEAK_DIR/../../lib.sh"
+run sysctl -w net.ipv4.tcp_congestion_control=cubic
+run sysctl -w net.core.default_qdisc=fq_codel

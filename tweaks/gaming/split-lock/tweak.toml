@@ -1,0 +1,10 @@
+title = "Stop split-lock slowdowns"
+explain = """
+Newer kernels deliberately slow down programs that do "split-lock" memory accesses.
+A few games (often older Windows titles under Proton) do this and lose a lot of
+performance. This switches the penalty off; the warning stays in the kernel log.
+"""
+touches = ["/etc/sysctl.d/80-creed-split-lock.conf"]
+recommend = "cpu:intel"
+privileged = true
+risk = "low"

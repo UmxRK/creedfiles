@@ -1,0 +1,8 @@
+title = "Clear Steam shader caches"
+explain = """
+Deletes the pre-compiled shaders Steam keeps per game. Useful after GPU driver updates
+or to reclaim space. Games will compile shaders again on first launch, which can stutter
+for a few minutes.
+"""
+destructive = true
+risk = "low"

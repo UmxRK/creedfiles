@@ -1,0 +1,9 @@
+// Creed: let local, active admins (wheel) run the Creed helper without a password.
+// The helper only runs root-owned tweak scripts from /usr/share/creed/tweaks.
+polkit.addRule(function(action, subject) {
+    if (action.id == "org.freedesktop.policykit.exec" &&
+        action.lookup("program") == "/usr/lib/creed/creed-helper" &&
+        subject.local && subject.active && subject.isInGroup("wheel")) {
+        return polkit.Result.YES;
+    }
+});

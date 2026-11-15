@@ -1,0 +1,3 @@
+. "$CREED_TWEAK_DIR/../../lib.sh"
+run paccache -rk1
+run paccache -ruk0

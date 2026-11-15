@@ -1,0 +1,6 @@
+. "$CREED_TWEAK_DIR/../../lib.sh"
+put /etc/modprobe.d/creed-nvidia.conf <<'X'
+# Creed: NVIDIA on Wayland
+options nvidia_drm modeset=1 fbdev=1
+options nvidia NVreg_PreserveVideoMemoryAllocations=1
+X

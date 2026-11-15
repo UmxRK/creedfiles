@@ -1,0 +1,16 @@
+. "$CREED_TWEAK_DIR/../../lib.sh"
+put /etc/systemd/zram-generator.conf <<'X'
+# Creed: compressed swap in RAM
+[zram0]
+zram-size = min(ram / 2, 8192)
+compression-algorithm = zstd
+swap-priority = 100
+X
+put /etc/sysctl.d/80-creed-zram.conf <<'X'
+# Creed: tuning for zram swap
+vm.swappiness = 180
+vm.watermark_boost_factor = 0
+vm.watermark_scale_factor = 125
+vm.page-cluster = 0
+X
+run sysctl --system

@@ -1,0 +1,9 @@
+title = "Clear app caches"
+explain = """
+Deletes cache folders that apps rebuild on their own: thumbnails, browser caches,
+Electron app caches (Discord, VS Code, Slack and similar) and the Mesa shader cache.
+Apps may feel slightly slower the first time you open them again. Your settings,
+logins and files are not touched.
+"""
+destructive = true
+risk = "low"

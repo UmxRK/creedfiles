@@ -1,0 +1,9 @@
+title = "Faster shutdown"
+explain = """
+Services that hang on shutdown are given 10 seconds instead of 90 before they are
+stopped, so a stuck program cannot hold up a reboot for a minute and a half.
+"""
+touches = ["/etc/systemd/system.conf.d/creed-timeout.conf", "/etc/systemd/user.conf.d/creed-timeout.conf"]
+recommend = "always"
+privileged = true
+risk = "low"

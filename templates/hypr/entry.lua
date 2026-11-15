@@ -18,6 +18,12 @@ else
     hl.on("hyprland.start", function() hl.exec_cmd("creed theme apply --no-reload && hyprctl reload") end)
 end
 
+-- Tweaks that adjust Hyprland itself (e.g. raw mouse input) drop small files here.
+for _, name in ipairs({ "raw-mouse" }) do
+    local t = home .. "/.config/hypr/creed-tweaks/" .. name .. ".lua"
+    if exists(t) then dofile(t) end
+end
+
 if exists(user) then
     dofile(user)
 end

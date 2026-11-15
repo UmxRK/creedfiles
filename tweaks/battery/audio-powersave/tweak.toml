@@ -1,0 +1,12 @@
+title = "Let the sound card sleep"
+explain = """
+Puts the built-in sound card to sleep after a second of silence. Saves a little power on
+laptops. On a few machines you may hear a soft click when sound starts.
+Takes effect after a reboot.
+"""
+touches = ["/etc/modprobe.d/creed-audio-powersave.conf"]
+recommend = "laptop"
+available = "laptop"
+privileged = true
+needs_reboot = true
+risk = "low"

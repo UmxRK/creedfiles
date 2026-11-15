@@ -1,0 +1,7 @@
+. "$CREED_TWEAK_DIR/../../lib.sh"
+mkdir -p "$HOME/.config/hypr/creed-tweaks"
+cat > "$HOME/.config/hypr/creed-tweaks/raw-mouse.lua" <<'X'
+-- Creed tweak: raw mouse input
+hl.config({ input = { accel_profile = "flat" } })
+X
+live && has hyprctl && hyprctl reload >/dev/null 2>&1 || true

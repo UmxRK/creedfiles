@@ -1,0 +1,10 @@
+title = "Raise vm.max_map_count for games"
+explain = """
+Some games (and many Proton titles) need far more memory mappings than the kernel
+default allows and crash or stutter when they run out. This sets vm.max_map_count to
+the value SteamOS uses. It costs nothing unless a program actually uses the mappings.
+"""
+touches = ["/etc/sysctl.d/80-creed-max-map-count.conf"]
+recommend = "always"
+privileged = true
+risk = "low"

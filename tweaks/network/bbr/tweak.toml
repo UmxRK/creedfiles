@@ -1,0 +1,10 @@
+title = "Faster TCP: BBR and fair queueing"
+explain = """
+Switches TCP congestion control to BBR with the fq scheduler. Downloads ramp up faster
+and latency stays lower when the line is busy, for example a game while something
+downloads. It is the default on many servers and safe on any connection.
+"""
+touches = ["/etc/sysctl.d/80-creed-bbr.conf", "/etc/modules-load.d/creed-bbr.conf"]
+recommend = "always"
+privileged = true
+risk = "low"

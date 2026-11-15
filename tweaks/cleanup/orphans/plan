@@ -1,0 +1,7 @@
+. "$CREED_TWEAK_DIR/../../lib.sh"
+list=$(pacman -Qdtq 2>/dev/null || true)
+if [ -z "$list" ]; then exit 0; fi
+n=$(echo "$list" | wc -l)
+size=$(pacman -Qi $list 2>/dev/null | awk -F': ' '/^Installed Size/ {print $2}' | paste -sd, -)
+echo "  $n package(s): $(echo $list | tr '\n' ' ')"
+echo "  Sizes: ${size}"

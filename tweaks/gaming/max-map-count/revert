@@ -1,0 +1,2 @@
+. "$CREED_TWEAK_DIR/../../lib.sh"
+run sysctl -w vm.max_map_count=1048576

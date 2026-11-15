@@ -1,0 +1,9 @@
+title = "Close background apps to free memory"
+explain = """
+Politely closes heavy apps that keep running in the background or tray (chat apps,
+music players, cloud sync, launchers) so their memory goes to your game or work.
+Each app gets a normal close request, the same as quitting it from its tray menu.
+Unsaved work in those apps could be lost, which is why the list is shown first.
+"""
+destructive = true
+risk = "medium"

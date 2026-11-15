@@ -36,6 +36,7 @@ CONFIG
   config path                   Show config file locations
   config validate               Check every config layer (exit 1 on error)
   config get <key>              Read an effective value, e.g. bar.size
+  config dump                   The whole effective config as JSON
   config set <key> <value> [--mode]   Write to overrides.toml (--mode: only this mode)
   config unset <key> [--mode]   Remove an override
 
@@ -200,6 +201,12 @@ fn run(args: &[String]) -> Result<(), String> {
                 }
                 Err(e) => Err(e.to_string()),
             },
+            "dump" => {
+                let c = load(None)?;
+                let v = serde_json::to_value(toml::Value::try_from(&c).map_err(|e| e.to_string())?).map_err(|e| e.to_string())?;
+                println!("{}", serde_json::to_string(&v).unwrap());
+                Ok(())
+            }
             "get" => {
                 let v = config::get_key(&load(None)?, a(2)).ok_or_else(|| format!("no such key '{}'", a(2)))?;
                 match v {

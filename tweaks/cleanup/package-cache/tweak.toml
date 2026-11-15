@@ -1,0 +1,10 @@
+title = "Clear old package downloads"
+explain = """
+pacman keeps every package version it ever downloaded. This removes all but the newest
+copy of installed packages and every copy of uninstalled ones. Downgrading would then
+need a fresh download.
+"""
+requires = ["paccache"]
+privileged = true
+destructive = true
+risk = "low"

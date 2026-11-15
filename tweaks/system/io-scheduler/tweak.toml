@@ -1,0 +1,10 @@
+title = "Best I/O scheduler per drive"
+explain = """
+Picks the disk scheduler that suits each drive: none for NVMe, mq-deadline for SATA
+SSDs and BFQ for spinning disks. Keeps the desktop responsive while large copies,
+updates or game installs run. Applies to drives as they are detected.
+"""
+touches = ["/etc/udev/rules.d/60-creed-ioschedulers.rules"]
+recommend = "always"
+privileged = true
+risk = "low"

@@ -1,0 +1,3 @@
+. "$CREED_TWEAK_DIR/../../lib.sh"
+run sysctl -w vm.swappiness=60
+run sysctl -w vm.page-cluster=3

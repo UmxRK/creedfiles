@@ -1,0 +1,5 @@
+. "$CREED_TWEAK_DIR/../../lib.sh"
+for p in discord Discord vesktop slack teams-for-linux telegram-desktop signal-desktop element-desktop spotify steam dropbox onedrive megasync zoom whatsapp-for-linux; do
+  pkill -TERM -u "$(id -u)" -x "$p" 2>/dev/null || true
+done
+true

@@ -1,0 +1,2 @@
+. "$CREED_TWEAK_DIR/../../lib.sh"
+run journalctl --vacuum-size=100M

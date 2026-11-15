@@ -1,0 +1,10 @@
+title = "Tune GameMode"
+explain = """
+Configures Feral GameMode, which Creed's Game Mode starts automatically: it raises the
+game's priority, switches the CPU to its performance governor while you play and pauses
+the screensaver. Everything returns to normal when the game closes.
+"""
+touches = ["~/.config/gamemode.ini"]
+recommend = "always"
+requires = ["gamemoded"]
+risk = "low"

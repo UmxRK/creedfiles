@@ -1,0 +1,9 @@
+title = "Shrink old system logs"
+explain = """
+Deletes system log entries beyond the newest 100 MB. Recent logs stay available for
+troubleshooting.
+"""
+requires = ["journalctl"]
+privileged = true
+destructive = true
+risk = "low"

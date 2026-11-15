@@ -1,0 +1,6 @@
+. "$CREED_TWEAK_DIR/../../lib.sh"
+put /etc/udev/rules.d/62-creed-usb-autosuspend.rules <<'X'
+# Creed: USB autosuspend, except input devices (HID class 03)
+ACTION=="add", SUBSYSTEM=="usb", ATTR{bInterfaceClass}!="03", TEST=="power/control", ATTR{power/control}="auto"
+X
+run udevadm control --reload

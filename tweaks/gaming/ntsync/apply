@@ -1,0 +1,7 @@
+. "$CREED_TWEAK_DIR/../../lib.sh"
+if live && ! modinfo ntsync >/dev/null 2>&1; then echo "This kernel has no ntsync module." >&2; exit 1; fi
+put /etc/modules-load.d/creed-ntsync.conf <<'X'
+# Creed: Wine/Proton NT synchronisation
+ntsync
+X
+run modprobe ntsync

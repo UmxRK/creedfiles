@@ -1,0 +1,6 @@
+. "$CREED_TWEAK_DIR/../../lib.sh"
+put /etc/sysctl.d/80-creed-max-map-count.conf <<'X'
+# Creed: more memory mappings for games (SteamOS value)
+vm.max_map_count = 2147483642
+X
+run sysctl --system

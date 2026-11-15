@@ -1,0 +1,10 @@
+title = "Load NTSync for Wine and Proton"
+explain = """
+NTSync lets Wine and Proton use the kernel for Windows-style synchronisation, which
+reduces CPU overhead and stutter in many games. This loads the module now and at every
+boot. Needs a kernel that ships the ntsync module (6.14 or newer).
+"""
+touches = ["/etc/modules-load.d/creed-ntsync.conf"]
+recommend = "always"
+privileged = true
+risk = "low"

@@ -1,0 +1,11 @@
+title = "Turn off Wi-Fi power saving"
+explain = """
+Wi-Fi power saving makes the adapter doze between packets, which causes ping spikes,
+lag in games and calls, and slow page loads on many cards. This keeps it awake. It costs
+a little battery on laptops and takes effect the next time Wi-Fi connects.
+"""
+touches = ["/etc/NetworkManager/conf.d/99-creed-wifi-powersave.conf"]
+recommend = "wifi,desktop"
+available = "wifi"
+privileged = true
+risk = "low"

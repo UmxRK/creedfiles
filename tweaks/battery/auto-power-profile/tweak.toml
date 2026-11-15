@@ -1,0 +1,11 @@
+title = "Automatic power profile on battery"
+explain = """
+Switches power-profiles-daemon to "power saver" when you unplug and back to "balanced"
+when you plug in, so you get longer battery life without thinking about it.
+"""
+touches = ["/etc/udev/rules.d/61-creed-power-profile.rules"]
+recommend = "laptop"
+available = "battery"
+requires = ["powerprofilesctl"]
+privileged = true
+risk = "low"

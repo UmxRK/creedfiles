@@ -1,0 +1,12 @@
+title = "NVIDIA: Wayland-ready driver options"
+explain = """
+Turns on kernel mode-setting and the framebuffer device for the NVIDIA driver and keeps
+video memory across suspend. Without these, Hyprland on NVIDIA can show a black screen,
+flicker, or lose the picture after sleep. Takes effect after a reboot.
+"""
+touches = ["/etc/modprobe.d/creed-nvidia.conf"]
+recommend = "nvidia"
+available = "nvidia"
+privileged = true
+needs_reboot = true
+risk = "low"

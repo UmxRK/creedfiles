@@ -1,0 +1,4 @@
+. "$CREED_TWEAK_DIR/../../lib.sh"
+list=$(pacman -Qdtq 2>/dev/null || true)
+[ -z "$list" ] && exit 0
+if live; then pacman -Rns --noconfirm $list; fi

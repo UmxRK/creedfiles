@@ -1,0 +1,9 @@
+. "$CREED_TWEAK_DIR/../../lib.sh"
+for f in system user; do
+put /etc/systemd/$f.conf.d/creed-timeout.conf <<'X'
+# Creed: do not wait 90 s for stuck services
+[Manager]
+DefaultTimeoutStopSec=10s
+X
+done
+run systemctl daemon-reexec

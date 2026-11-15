@@ -1,0 +1,5 @@
+. "$CREED_TWEAK_DIR/../../lib.sh"
+put /etc/modprobe.d/creed-audio-powersave.conf <<'X'
+# Creed: sound card power saving
+options snd_hda_intel power_save=1
+X

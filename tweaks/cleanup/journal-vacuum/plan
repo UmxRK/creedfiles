@@ -1,0 +1,2 @@
+. "$CREED_TWEAK_DIR/../../lib.sh"
+echo "  $(journalctl --disk-usage 2>/dev/null | sed 's/^Archived and active journals take up //') in use, trimmed to 100 MB"

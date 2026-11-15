@@ -1,0 +1,5 @@
+. "$CREED_TWEAK_DIR/../../lib.sh"
+keep=$(paccache -dk1 2>/dev/null | tail -1)
+gone=$(paccache -duk0 2>/dev/null | tail -1)
+echo "  Old versions:   ${keep:-nothing to remove}"
+echo "  Uninstalled:    ${gone:-nothing to remove}"

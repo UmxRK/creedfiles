@@ -1,0 +1,8 @@
+title = "Raw mouse input (no acceleration)"
+explain = """
+Turns off pointer acceleration in Hyprland so mouse movement maps 1:1 to the cursor,
+which is what most players want for aiming. Applies immediately.
+"""
+touches = ["~/.config/hypr/creed-tweaks/raw-mouse.lua"]
+recommend = "desktop"
+risk = "low"
