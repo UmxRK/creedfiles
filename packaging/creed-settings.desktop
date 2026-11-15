@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Creed Settings
+GenericName=Desktop Settings
+Comment=Modes, glass, bar, dock, tweaks and Game Mode for the Creed desktop
+Exec=creed-settings
+Icon=creed-settings
+Terminal=false
+Categories=Settings;DesktopSettings;GTK;
+Keywords=creed;theme;mode;windows;macos;glass;tweaks;game;
+StartupWMClass=org.creed.Settings

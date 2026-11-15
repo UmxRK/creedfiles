@@ -1,0 +1,10 @@
+[SddmGreeterTheme]
+Name=Creed (macOS)
+Description=Creed login screen (soft, warm)
+Author=Creed contributors
+License=GPL-3.0-or-later
+Type=sddm-theme
+Version=1.0
+MainScript=Main.qml
+ConfigFile=theme.conf
+QtVersion=6

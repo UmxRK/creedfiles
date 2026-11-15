@@ -1,0 +1,739 @@
+#!/usr/bin/env python3
+# Creed Settings - GTK4 / libadwaita front-end for `creed`.
+# It never edits files itself: every change goes through `creed config set` (validated,
+# atomic) so the settings app and hand-edited TOML can never disagree.
+# Runs only while open; it costs nothing at idle.
+
+import json
+import os
+import shutil
+import subprocess
+import sys
+import threading
+
+import gi
+
+gi.require_version("Gtk", "4.0")
+gi.require_version("Adw", "1")
+from gi.repository import Adw, Gdk, Gio, GLib, Gtk  # noqa: E402
+
+APP_ID = "org.creed.Settings"
+CREED = shutil.which("creed") or os.path.expanduser("~/.local/bin/creed")
+
+# Keys that change the Hyprland config (need `creed theme apply`), not just the shell.
+HYPR_KEYS = ("glass.", "appearance.motion", "style.window", "style.titlebar", "style.material",
+             "general.keybind_profile", "general.terminal", "general.file_manager", "general.browser",
+             "general.kb_layout", "appearance.font", "appearance.scheme", "appearance.color_source",
+             "appearance.preset", "appearance.wallpaper", "appearance.high_contrast", "a11y.reduce_motion")
+
+BAR_MODULES = ["launcher", "workspaces", "window", "appmenu", "taskbar", "search", "taskview", "widgets",
+               "clock", "date", "tray", "media", "network", "bluetooth", "volume", "battery", "sysstat",
+               "weather", "keyboard", "gamemode", "notifications", "control", "power", "spacer"]
+
+PROCEDURAL = [("creed://dawn", "Creed Dawn"), ("creed://dusk", "Creed Dusk"), ("creed://bloom", "Bloom"),
+              ("creed://ribbon", "Ribbon"), ("creed://dunes", "Dunes"), ("creed://horizon", "Horizon"),
+              ("creed://aurora", "Aurora"), ("creed://aqua", "Aqua")]
+
+PRESETS = ["ember", "blossom", "dusk", "frost", "moss", "sand", "mono"]
+
+
+def creed(*args, check=False):
+    """Runs the creed CLI; returns (ok, stdout+stderr)."""
+    try:
+        p = subprocess.run([CREED, *args], capture_output=True, text=True, timeout=60)
+    except (OSError, subprocess.TimeoutExpired) as e:
+        return False, str(e)
+    out = (p.stdout + p.stderr).strip()
+    if check and p.returncode != 0:
+        raise RuntimeError(out)
+    return p.returncode == 0, out
+
+
+def toml_value(v):
+    if isinstance(v, bool):
+        return "true" if v else "false"
+    if isinstance(v, (int, float)):
+        return repr(round(v, 4)) if isinstance(v, float) else str(v)
+    if isinstance(v, list):
+        return "[" + ", ".join(json.dumps(x) for x in v) + "]"
+    return json.dumps(v)
+
+
+class Store:
+    """Effective config (from `creed config dump`) plus debounced writes."""
+
+    def __init__(self, window):
+        self.window = window
+        self.data = {}
+        self.pending = {}
+        self.timer = None
+        self.mode_only = False
+        self.reload()
+
+    def reload(self):
+        ok, out = creed("config", "dump")
+        if ok:
+            try:
+                self.data = json.loads(out)
+            except json.JSONDecodeError:
+                self.data = {}
+        else:
+            self.window.toast(f"Config problem: {out}")
+
+    def get(self, key, default=None):
+        cur = self.data
+        for part in key.split("."):
+            if not isinstance(cur, dict) or part not in cur:
+                return default
+            cur = cur[part]
+        return cur
+
+    def set(self, key, value, immediate=False):
+        # Mirror locally so dependent widgets see the change right away.
+        cur = self.data
+        parts = key.split(".")
+        for p in parts[:-1]:
+            cur = cur.setdefault(p, {})
+        cur[parts[-1]] = value
+        self.pending[key] = value
+        if self.timer:
+            GLib.source_remove(self.timer)
+        self.timer = GLib.timeout_add(10 if immediate else 450, self.flush)
+
+    def flush(self):
+        self.timer = None
+        items, self.pending = self.pending, {}
+        needs_theme = any(k.startswith(HYPR_KEYS) for k in items)
+        mode_only = self.mode_only
+
+        def work():
+            errors = []
+            for k, v in items.items():
+                args = ["config", "set", k, toml_value(v)]
+                if mode_only and not k.startswith("general.mode"):
+                    args.append("--mode")
+                ok, out = creed(*args)
+                if not ok:
+                    errors.append(out)
+            if needs_theme and not errors:
+                ok, out = creed("theme", "apply")
+                if not ok:
+                    errors.append(out)
+            GLib.idle_add(self.done, errors)
+
+        threading.Thread(target=work, daemon=True).start()
+        return False
+
+    def done(self, errors):
+        if errors:
+            self.window.toast(errors[0].replace("creed: ", ""))
+            self.reload()
+        return False
+
+
+# ───────────────────────────── helpers to build rows ─────────────────────────────
+
+def switch_row(store, key, title, subtitle=""):
+    row = Adw.SwitchRow(title=title, subtitle=subtitle, use_markup=False)
+    row.set_active(bool(store.get(key, False)))
+    row.connect("notify::active", lambda r, _p: store.set(key, r.get_active()))
+    return row
+
+
+def spin_row(store, key, title, lo, hi, step, digits=0, subtitle=""):
+    adj = Gtk.Adjustment(lower=lo, upper=hi, step_increment=step, page_increment=step * 5)
+    row = Adw.SpinRow(title=title, subtitle=subtitle, adjustment=adj, digits=digits, use_markup=False)
+    row.set_value(float(store.get(key, lo) or lo))
+    row.connect("notify::value", lambda r, _p: store.set(key, round(r.get_value(), digits) if digits else int(r.get_value())))
+    return row
+
+
+def slider_row(store, key, title, lo, hi, step, subtitle="", fmt="{:.2f}"):
+    row = Adw.ActionRow(title=title, subtitle=subtitle, use_markup=False)
+    scale = Gtk.Scale.new_with_range(Gtk.Orientation.HORIZONTAL, lo, hi, step)
+    scale.set_hexpand(True)
+    scale.set_size_request(220, -1)
+    scale.set_draw_value(True)
+    scale.set_value_pos(Gtk.PositionType.RIGHT)
+    scale.set_format_value_func(lambda _s, v: fmt.format(v))
+    scale.set_value(float(store.get(key, lo) or lo))
+    scale.connect("value-changed", lambda s: store.set(key, round(s.get_value(), 3)))
+    scale.update_property([Gtk.AccessibleProperty.LABEL], [title])
+    row.add_suffix(scale)
+    return row
+
+
+def combo_row(store, key, title, options, subtitle=""):
+    """options: list of (value, label)."""
+    labels = Gtk.StringList.new([lbl for _, lbl in options])
+    row = Adw.ComboRow(title=title, subtitle=subtitle, model=labels, use_markup=False)
+    cur = store.get(key)
+    values = [v for v, _ in options]
+    if cur in values:
+        row.set_selected(values.index(cur))
+    row.connect("notify::selected", lambda r, _p: store.set(key, values[r.get_selected()]))
+    return row
+
+
+def entry_row(store, key, title):
+    row = Adw.EntryRow(title=title, use_markup=False)
+    row.set_text(str(store.get(key, "") or ""))
+    row.set_show_apply_button(True)
+    row.connect("apply", lambda r: store.set(key, r.get_text(), immediate=True))
+    return row
+
+
+def color_row(store, key, title, subtitle=""):
+    row = Adw.ActionRow(title=title, subtitle=subtitle, use_markup=False)
+    btn = Gtk.ColorDialogButton(dialog=Gtk.ColorDialog(with_alpha=True))
+    rgba = Gdk.RGBA()
+    rgba.parse(_css_color(store.get(key, "#ffffff10")))
+    btn.set_rgba(rgba)
+    btn.set_valign(Gtk.Align.CENTER)
+
+    def changed(b, _p):
+        c = b.get_rgba()
+        hexv = "#{:02x}{:02x}{:02x}{:02x}".format(round(c.red * 255), round(c.green * 255), round(c.blue * 255), round(c.alpha * 255))
+        store.set(key, hexv)
+
+    btn.connect("notify::rgba", changed)
+    row.add_suffix(btn)
+    return row
+
+
+def _css_color(hexv):
+    h = (hexv or "#000000").lstrip("#")
+    if len(h) == 8:
+        r, g, b, a = (int(h[i:i + 2], 16) for i in (0, 2, 4, 6))
+        return f"rgba({r},{g},{b},{a / 255:.3f})"
+    return "#" + h
+
+
+def esc(s):
+    return GLib.markup_escape_text(s) if s else s
+
+
+def group(title, description="", *rows):
+    g = Adw.PreferencesGroup(title=esc(title), description=esc(description))
+    for r in rows:
+        g.add(r)
+    return g
+
+
+def page(title, icon, *groups):
+    p = Adw.PreferencesPage(title=title, icon_name=icon)
+    for g in groups:
+        p.add(g)
+    return p
+
+
+# ───────────────────────────── pages ─────────────────────────────
+
+class ModesPage(Gtk.ScrolledWindow):
+    def __init__(self, win):
+        super().__init__(vexpand=True)
+        self.win = win
+        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=18, margin_top=24, margin_bottom=24, margin_start=24, margin_end=24)
+        title = Gtk.Label(label="Pick a look", xalign=0, css_classes=["title-1"])
+        sub = Gtk.Label(label="Each mode changes the whole desktop: bar, dock, menus, window style, keyboard shortcuts, lock screen and app colours. You can switch back at any time.", xalign=0, wrap=True, css_classes=["dim-label"])
+        box.append(title)
+        box.append(sub)
+        self.flow = Gtk.FlowBox(selection_mode=Gtk.SelectionMode.NONE, max_children_per_line=3, min_children_per_line=1, column_spacing=16, row_spacing=16, homogeneous=True)
+        box.append(self.flow)
+        self.set_child(box)
+        self.populate()
+
+    def populate(self):
+        while (c := self.flow.get_first_child()) is not None:
+            self.flow.remove(c)
+        ok, out = creed("mode", "list")
+        current = ""
+        modes = []
+        for line in out.splitlines():
+            if not line.strip():
+                continue
+            marker, rest = line[:1], line[2:]
+            parts = rest.split(None, 1)
+            mid = parts[0]
+            remainder = parts[1] if len(parts) > 1 else ""
+            # name is padded to 16 chars in the CLI output
+            name = remainder[:16].strip()
+            desc = remainder[16:].strip()
+            modes.append((mid, name, desc))
+            if marker == "●":
+                current = mid
+        data_dir = os.environ.get("CREED_DATA") or _data_dir()
+        for mid, name, desc in modes:
+            self.flow.append(self.card(mid, name, desc, mid == current, data_dir))
+
+    def card(self, mid, name, desc, active, data_dir):
+        btn = Gtk.Button(css_classes=["card", "mode-card"] + (["mode-active"] if active else []))
+        v = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8, margin_top=10, margin_bottom=12, margin_start=10, margin_end=10)
+        prev = os.path.join(data_dir, "modes", mid, "preview.png")
+        if os.path.isfile(prev):
+            pic = Gtk.Picture.new_for_filename(prev)
+            pic.set_content_fit(Gtk.ContentFit.COVER)
+            pic.set_size_request(280, 158)
+            pic.add_css_class("mode-preview")
+            v.append(pic)
+        head = Gtk.Box(spacing=8)
+        head.append(Gtk.Label(label=name, xalign=0, hexpand=True, css_classes=["heading"]))
+        if active:
+            head.append(Gtk.Label(label="Active", css_classes=["accent", "caption-heading"]))
+        v.append(head)
+        v.append(Gtk.Label(label=desc, xalign=0, wrap=True, max_width_chars=36, css_classes=["dim-label", "caption"]))
+        btn.set_child(v)
+        btn.update_property([Gtk.AccessibleProperty.LABEL], [f"{name} mode. {desc}"])
+        btn.connect("clicked", lambda _b: self.choose(mid, name))
+        return btn
+
+    def choose(self, mid, name):
+        self.win.toast(f"Switching to {name}…")
+
+        def work():
+            ok, out = creed("mode", "set", mid)
+            GLib.idle_add(self.after, ok, out, name)
+
+        threading.Thread(target=work, daemon=True).start()
+
+    def after(self, ok, out, name):
+        self.win.toast(f"{name} is on" if ok else out)
+        self.win.store.reload()
+        self.populate()
+        return False
+
+
+def _data_dir():
+    for d in (os.path.expanduser("~/.local/share/creed"), "/usr/share/creed"):
+        if os.path.isdir(os.path.join(d, "modes")):
+            return d
+    return "/usr/share/creed"
+
+
+def appearance_page(store, win):
+    wp_options = [(v, l) for v, l in PROCEDURAL]
+    cur = store.get("appearance.wallpaper", "")
+    if cur and not cur.startswith("creed://"):
+        wp_options.append((cur, os.path.basename(cur)))
+    wp_row = combo_row(store, "appearance.wallpaper", "Wallpaper", wp_options, "Built-in wallpapers are drawn live at your screen's resolution")
+    pick = Gtk.Button(label="Choose image…", valign=Gtk.Align.CENTER)
+
+    def choose(_b):
+        dlg = Gtk.FileDialog(title="Choose a wallpaper")
+        f = Gtk.FileFilter()
+        f.set_name("Images")
+        for m in ("image/png", "image/jpeg", "image/webp"):
+            f.add_mime_type(m)
+        filters = Gio.ListStore.new(Gtk.FileFilter)
+        filters.append(f)
+        dlg.set_filters(filters)
+
+        def done(d, res):
+            try:
+                file = d.open_finish(res)
+            except GLib.Error:
+                return
+            if file:
+                store.set("appearance.wallpaper", file.get_path(), immediate=True)
+                win.toast("Wallpaper set - colours follow it if “From wallpaper” is on")
+
+        dlg.open(win, None, done)
+
+    pick.connect("clicked", choose)
+    wp_row.add_suffix(pick)
+    return page(
+        "Appearance", "applications-graphics-symbolic",
+        group("Colours", "",
+              combo_row(store, "appearance.color_source", "Colour source", [("wallpaper", "From wallpaper"), ("preset", "Preset palette")]),
+              combo_row(store, "appearance.preset", "Preset", [(p, p.capitalize()) for p in PRESETS]),
+              combo_row(store, "appearance.scheme", "Style", [("dark", "Dark"), ("light", "Light")]),
+              wp_row),
+        group("Motion", "Choose how lively the desktop feels. Lighter presets use less GPU.",
+              combo_row(store, "appearance.motion", "Animations", [
+                  ("expressive", "Expressive - springy, playful (most GPU)"),
+                  ("smooth", "Smooth - quick eased transitions"),
+                  ("minimal", "Minimal - short fades only"),
+                  ("off", "Off - instant (least GPU)")])),
+        group("Text", "",
+              spin_row(store, "appearance.font_size", "Font size (pt)", 7, 20, 0.5, 1),
+              slider_row(store, "appearance.text_scale", "Text scale", 0.8, 2.0, 0.05, fmt="{:.2f}×"),
+              entry_row(store, "appearance.font", "Interface font")),
+    )
+
+
+def glass_page(store):
+    elements = [("bar", "Bar"), ("dock", "Dock"), ("launcher", "Launcher & search"), ("control", "Control center"), ("notifications", "Notifications")]
+    per = Adw.PreferencesGroup(title="Per element", description="Override frost and shine for individual parts.")
+    for key, label in elements:
+        exp = Adw.ExpanderRow(title=label, use_markup=False)
+        exp.add_row(slider_row(store, f"glass.elements.{key}.frost", "Frost", 0, 1, 0.01))
+        exp.add_row(slider_row(store, f"glass.elements.{key}.specular", "Shine", 0, 1, 0.01))
+        per.add(exp)
+    return page(
+        "Glass", "weather-fog-symbolic",
+        group("Material", "Liquid Glass bends what is behind it. Weak or integrated GPUs fall back to frosted blur automatically on “Automatic”.",
+              switch_row(store, "glass.enabled", "Glass and blur"),
+              combo_row(store, "glass.quality", "Quality", [("auto", "Automatic (by GPU)"), ("low", "Low - frost only"), ("medium", "Medium"), ("high", "High - refraction"), ("ultra", "Ultra")]),
+              combo_row(store, "style.material", "Material", [("glass", "Liquid Glass"), ("frost", "Frosted"), ("mica", "Mica"), ("acrylic", "Acrylic"), ("aqua", "Aqua"), ("solid", "Solid")])),
+        group("Lens", "",
+              slider_row(store, "glass.refraction", "Refraction", 0, 1, 0.01, "How strongly the glass bends the background"),
+              slider_row(store, "glass.thickness", "Edge thickness", 4, 40, 1, fmt="{:.0f}"),
+              slider_row(store, "glass.roughness", "Clarity", 0, 1, 0.01, "0 = crystal clear, 1 = frosted"),
+              spin_row(store, "glass.blur_size", "Blur radius", 1, 30, 1),
+              spin_row(store, "glass.blur_passes", "Blur passes", 1, 6, 1)),
+        group("Surface", "",
+              slider_row(store, "glass.frost", "Frost", 0, 1, 0.01, "How opaque panels are on top of the glass"),
+              color_row(store, "glass.tint", "Tint"),
+              slider_row(store, "glass.specular", "Shine", 0, 1, 0.01, "Edge highlight"),
+              switch_row(store, "glass.specular_follow_cursor", "Shine follows the pointer")),
+        per,
+    )
+
+
+class ModuleList(Adw.PreferencesGroup):
+    """Editable ordered list of bar modules for one section."""
+
+    def __init__(self, store, key, title):
+        super().__init__(title=esc(title))
+        self.store, self.key = store, key
+        add = Gtk.MenuButton(icon_name="list-add-symbolic", tooltip_text="Add module", css_classes=["flat"])
+        menu = Gio.Menu()
+        for m in BAR_MODULES:
+            menu.append(m, f"win.addmod::{key}|{m}")
+        add.set_menu_model(menu)
+        self.set_header_suffix(add)
+        self.rows = []
+        self.render()
+
+    def render(self):
+        for r in self.rows:
+            self.remove(r)
+        self.rows = []
+        items = list(self.store.get(self.key, []) or [])
+        if not items:
+            r = Adw.ActionRow(title="Empty", subtitle="Use + to add modules", use_markup=False)
+            self.add(r)
+            self.rows.append(r)
+        for i, m in enumerate(items):
+            r = Adw.ActionRow(title=m, use_markup=False)
+            for icon, tip, fn in (("go-up-symbolic", "Move up", lambda _b, i=i: self.move(i, -1)),
+                                  ("go-down-symbolic", "Move down", lambda _b, i=i: self.move(i, 1)),
+                                  ("user-trash-symbolic", "Remove", lambda _b, i=i: self.delete(i))):
+                b = Gtk.Button(icon_name=icon, tooltip_text=tip, valign=Gtk.Align.CENTER, css_classes=["flat"])
+                b.connect("clicked", fn)
+                r.add_suffix(b)
+            self.add(r)
+            self.rows.append(r)
+
+    def save(self, items):
+        self.store.set(self.key, items, immediate=True)
+        self.render()
+
+    def move(self, i, d):
+        items = list(self.store.get(self.key, []))
+        j = i + d
+        if 0 <= j < len(items):
+            items[i], items[j] = items[j], items[i]
+            self.save(items)
+
+    def delete(self, i):
+        items = list(self.store.get(self.key, []))
+        del items[i]
+        self.save(items)
+
+    def append(self, m):
+        items = list(self.store.get(self.key, []))
+        items.append(m)
+        self.save(items)
+
+
+def bar_page(store, win):
+    lists = [ModuleList(store, f"bar.{s}", f"{s.capitalize()} modules") for s in ("left", "center", "right")]
+    win.module_lists = {l.key: l for l in lists}
+    return page(
+        "Bar & Dock", "view-dual-symbolic",
+        group("Bar", "",
+              switch_row(store, "bar.enabled", "Show the bar"),
+              combo_row(store, "bar.position", "Position", [("top", "Top"), ("bottom", "Bottom"), ("left", "Left"), ("right", "Right")]),
+              combo_row(store, "bar.style", "Style", [("floating", "Floating"), ("edge", "Edge to edge"), ("islands", "Islands")]),
+              spin_row(store, "bar.size", "Height", 20, 96, 1),
+              spin_row(store, "bar.margin", "Gap from screen edge", 0, 64, 1),
+              spin_row(store, "bar.radius", "Corner radius", 0, 48, 1),
+              spin_row(store, "bar.workspaces", "Workspaces shown", 1, 20, 1),
+              entry_row(store, "bar.clock_format", "Clock format (strftime)")),
+        *lists,
+        group("Dock", "",
+              switch_row(store, "dock.enabled", "Show the dock"),
+              combo_row(store, "dock.position", "Position", [("bottom", "Bottom"), ("left", "Left"), ("right", "Right"), ("top", "Top")]),
+              spin_row(store, "dock.icon_size", "Icon size", 16, 128, 2),
+              slider_row(store, "dock.magnify", "Magnification", 1.0, 2.5, 0.05, "1.0 = off", fmt="{:.2f}×"),
+              switch_row(store, "dock.autohide", "Hide automatically"),
+              switch_row(store, "dock.show_running", "Show running apps")),
+    )
+
+
+class TweaksPage(Gtk.ScrolledWindow):
+    CATS = [("gaming", "Gaming"), ("network", "Network & Wi-Fi"), ("system", "System & memory"), ("battery", "Battery & laptop"), ("cleanup", "Cleanup & free space")]
+
+    def __init__(self, win):
+        super().__init__(vexpand=True)
+        self.win = win
+        self.prefs = Adw.PreferencesPage()
+        self.set_child(self.prefs)
+        self.groups = []
+        self.refresh()
+
+    def refresh(self):
+        for g in self.groups:
+            self.prefs.remove(g)
+        self.groups = []
+        ok, out = creed("tweak", "list", "--json")
+        try:
+            tweaks = json.loads(out) if ok else []
+        except json.JSONDecodeError:
+            tweaks = []
+        intro = Adw.PreferencesGroup(title="Tweaks", description=esc("Every tweak shows exactly what it changes before it runs. ★ marks what is recommended for this machine. System tweaks are reversible with one click; cleanups delete data and always ask."))
+        self.prefs.add(intro)
+        self.groups.append(intro)
+        for cat, title in self.CATS:
+            items = [t for t in tweaks if t["category"] == cat]
+            if not items:
+                continue
+            g = Adw.PreferencesGroup(title=esc(title))
+            for t in items:
+                g.add(self.row(t))
+            self.prefs.add(g)
+            self.groups.append(g)
+
+    def row(self, t):
+        star = "★ " if t["recommended"] else ""
+        status = {"applied": "Applied", "off": "", "n/a": "Not available on this machine"}[t["status"]]
+        r = Adw.ActionRow(title=f"{star}{t['title']}", subtitle=status, use_markup=False)
+        r.set_title_lines(1)
+        b = Gtk.Button(label="Details", valign=Gtk.Align.CENTER, css_classes=["flat"])
+        b.connect("clicked", lambda _b: self.details(t))
+        r.add_suffix(b)
+        if t["status"] == "applied" and not t["destructive"]:
+            act = Gtk.Button(label="Revert", valign=Gtk.Align.CENTER)
+            act.connect("clicked", lambda _b: self.run(["tweak", "revert", t["id"]], f"Reverted: {t['title']}"))
+            r.add_suffix(act)
+        elif t["status"] != "n/a":
+            act = Gtk.Button(label="Run" if t["destructive"] else "Apply", valign=Gtk.Align.CENTER, css_classes=["destructive-action" if t["destructive"] else "suggested-action"])
+            act.connect("clicked", lambda _b: self.details(t))
+            r.add_suffix(act)
+        return r
+
+    def details(self, t):
+        ok, text = creed("tweak", "explain", t["id"])
+        dlg = Adw.AlertDialog(heading=t["title"], body=text if ok else t["explain"])
+        dlg.set_body_use_markup(False)
+        dlg.add_response("cancel", "Close")
+        if t["status"] == "applied" and not t["destructive"]:
+            dlg.add_response("revert", "Revert")
+        elif t["status"] != "n/a":
+            dlg.add_response("apply", "Delete now" if t["destructive"] else "Apply")
+            dlg.set_response_appearance("apply", Adw.ResponseAppearance.DESTRUCTIVE if t["destructive"] else Adw.ResponseAppearance.SUGGESTED)
+        dlg.set_default_response("cancel")
+        dlg.set_close_response("cancel")
+
+        def resp(_d, r):
+            if r == "apply":
+                args = ["tweak", "apply", t["id"], "--yes"] + (["--confirm"] if t["destructive"] else [])
+                self.run(args, f"Done: {t['title']}" + (" - reboot to finish" if t["needs_reboot"] else ""))
+            elif r == "revert":
+                self.run(["tweak", "revert", t["id"]], f"Reverted: {t['title']}")
+
+        dlg.connect("response", resp)
+        dlg.present(self.win)
+
+    def run(self, args, msg):
+        def work():
+            ok, out = creed(*args)
+            GLib.idle_add(self.after, ok, out, msg)
+
+        threading.Thread(target=work, daemon=True).start()
+
+    def after(self, ok, out, msg):
+        self.win.toast(msg if ok else out.splitlines()[-1] if out else "Failed")
+        self.refresh()
+        return False
+
+
+def game_page(store):
+    return page(
+        "Game Mode", "input-gaming-symbolic",
+        group("Game Mode", "Turns on by itself when a game starts (Steam, Lutris, Heroic, gamescope, or a full-screen Wine game) and off when it closes. Toggle any time with Super+G.",
+              switch_row(store, "game.auto_detect", "Detect games automatically"),
+              switch_row(store, "game.unload_shell", "Unload the bar, dock and wallpaper while playing", "Frees most of Creed's memory; notifications and the volume OSD stay"),
+              switch_row(store, "game.disable_effects", "Pause blur, glass, shadows and animations", "Also allows tearing for the lowest input latency"),
+              switch_row(store, "game.performance_governor", "Performance CPU governor (GameMode)")),
+    )
+
+
+def system_page(store):
+    return page(
+        "Desktop", "preferences-system-symbolic",
+        group("Apps", "",
+              entry_row(store, "general.terminal", "Terminal"),
+              entry_row(store, "general.file_manager", "File manager"),
+              entry_row(store, "general.browser", "Browser"),
+              switch_row(store, "general.theme_browser", "Theme Firefox with the mode")),
+        group("Keyboard", "",
+              combo_row(store, "general.keybind_profile", "Shortcuts", [("mode", "Follow the mode (Windows / Mac / Creed keys)"), ("creed", "Always Creed keys")]),
+              entry_row(store, "general.kb_layout", "Keyboard layout (empty = system)")),
+        group("Notifications", "",
+              combo_row(store, "notifications.position", "Position", [("top-right", "Top right"), ("top-left", "Top left"), ("top-center", "Top centre"), ("bottom-right", "Bottom right"), ("bottom-left", "Bottom left")]),
+              spin_row(store, "notifications.timeout_ms", "Hide after (ms)", 0, 60000, 500),
+              switch_row(store, "notifications.do_not_disturb", "Do not disturb")),
+        group("Weather", "",
+              switch_row(store, "weather.enabled", "Show weather"),
+              entry_row(store, "weather.location", "Location (empty = automatic)"),
+              switch_row(store, "weather.metric", "Celsius")),
+    )
+
+
+def a11y_page(store):
+    return page(
+        "Accessibility", "preferences-desktop-accessibility-symbolic",
+        group("Seeing", "",
+              switch_row(store, "a11y.screen_reader", "Screen reader support", "Bar, dock and panels are readable by Orca"),
+              switch_row(store, "appearance.high_contrast", "High contrast"),
+              slider_row(store, "appearance.text_scale", "Text size", 0.8, 2.0, 0.05, fmt="{:.2f}×")),
+        group("Motion and focus", "",
+              switch_row(store, "a11y.reduce_motion", "Reduce motion"),
+              switch_row(store, "a11y.focus_ring", "Show keyboard focus ring")),
+    )
+
+
+class AboutPage(Gtk.ScrolledWindow):
+    def __init__(self, win):
+        super().__init__(vexpand=True)
+        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12, margin_top=24, margin_bottom=24, margin_start=24, margin_end=24)
+        ok, ver = creed("version")
+        box.append(Gtk.Label(label="Creed", xalign=0, css_classes=["title-1"]))
+        box.append(Gtk.Label(label=ver, xalign=0, css_classes=["dim-label"]))
+        self.ram = Gtk.Label(xalign=0, css_classes=["monospace"])
+        self.doc = Gtk.Label(xalign=0, wrap=True, selectable=True, css_classes=["monospace"])
+        for title, lbl in (("Memory", self.ram), ("Health check", self.doc)):
+            box.append(Gtk.Label(label=title, xalign=0, css_classes=["heading"], margin_top=12))
+            box.append(lbl)
+        btns = Gtk.Box(spacing=8, margin_top=12)
+        for label, args in (("Check again", None), ("Update Creed", ["update"])):
+            b = Gtk.Button(label=label)
+            b.connect("clicked", lambda _b, a=args: self.refresh(a))
+            btns.append(b)
+        box.append(btns)
+        self.set_child(box)
+        self.refresh(None)
+
+    def refresh(self, args):
+        def work():
+            extra = creed(*args)[1] + "\n\n" if args else ""
+            ram = creed("ram")[1]
+            doc = creed("doctor")[1]
+            GLib.idle_add(lambda: (self.ram.set_text(ram), self.doc.set_text(extra + doc)) and False)
+
+        threading.Thread(target=work, daemon=True).start()
+
+
+# ───────────────────────────── window ─────────────────────────────
+
+class Window(Adw.ApplicationWindow):
+    def __init__(self, app, start_page=None, welcome=False):
+        super().__init__(application=app, title="Creed Settings", default_width=1000, default_height=700)
+        self.store = Store(self)
+        self.module_lists = {}
+        self.toasts = Adw.ToastOverlay()
+        act = Gio.SimpleAction.new("addmod", GLib.VariantType.new("s"))
+        act.connect("activate", lambda _a, v: self.add_module(v.get_string()))
+        self.add_action(act)
+
+        self.stack = Gtk.Stack(transition_type=Gtk.StackTransitionType.CROSSFADE)
+        pages = [
+            ("modes", "Modes", "view-grid-symbolic", ModesPage(self)),
+            ("appearance", "Appearance", "applications-graphics-symbolic", appearance_page(self.store, self)),
+            ("glass", "Glass", "weather-fog-symbolic", glass_page(self.store)),
+            ("bar", "Bar & Dock", "view-dual-symbolic", bar_page(self.store, self)),
+            ("tweaks", "Tweaks", "applications-engineering-symbolic", TweaksPage(self)),
+            ("game", "Game Mode", "input-gaming-symbolic", game_page(self.store)),
+            ("desktop", "Desktop", "preferences-system-symbolic", system_page(self.store)),
+            ("a11y", "Accessibility", "preferences-desktop-accessibility-symbolic", a11y_page(self.store)),
+            ("about", "About", "help-about-symbolic", AboutPage(self)),
+        ]
+        for name, title, icon, widget in pages:
+            pg = self.stack.add_titled(widget, name, title)
+            pg.set_icon_name(icon)
+        sidebar = Gtk.StackSidebar(stack=self.stack, vexpand=True)
+        sidebar.set_size_request(210, -1)
+
+        scope = Adw.SwitchRow(title="Only this mode", subtitle="Changes apply to the current mode only", use_markup=False)
+        scope.connect("notify::active", lambda r, _p: setattr(self.store, "mode_only", r.get_active()))
+        scope_box = Gtk.ListBox(css_classes=["boxed-list"], selection_mode=Gtk.SelectionMode.NONE, margin_start=8, margin_end=8, margin_bottom=8)
+        scope_box.append(scope)
+
+        side = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+        side.append(sidebar)
+        side.append(scope_box)
+        split = Adw.NavigationSplitView()
+        split.set_sidebar(Adw.NavigationPage(title="Creed", child=self._with_header(side, False)))
+        split.set_content(Adw.NavigationPage(title="Settings", child=self._with_header(self.stack, True)))
+        self.toasts.set_child(split)
+        self.set_content(self.toasts)
+        if welcome:
+            self.toast("Welcome to Creed! Pick a mode to start - everything else can wait.")
+            self.stack.set_visible_child_name("modes")
+        elif start_page:
+            self.stack.set_visible_child_name(start_page)
+
+    def _with_header(self, child, content):
+        tv = Adw.ToolbarView()
+        tv.add_top_bar(Adw.HeaderBar(show_title=not content))
+        tv.set_content(child)
+        return tv
+
+    def toast(self, text):
+        self.toasts.add_toast(Adw.Toast(title=GLib.markup_escape_text(text.strip()[:200]), timeout=4))
+
+    def add_module(self, spec):
+        key, m = spec.split("|", 1)
+        if key in self.module_lists:
+            self.module_lists[key].append(m)
+
+
+CSS = b"""
+.mode-card { padding: 0; border-radius: 16px; }
+.mode-card.mode-active { box-shadow: inset 0 0 0 2px @accent_bg_color; }
+.mode-preview { border-radius: 10px; }
+"""
+
+
+class App(Adw.Application):
+    def __init__(self):
+        super().__init__(application_id=APP_ID, flags=Gio.ApplicationFlags.HANDLES_COMMAND_LINE)
+        self.page = None
+        self.welcome = False
+
+    def do_command_line(self, cmd):
+        args = cmd.get_arguments()[1:]
+        if "--welcome" in args:
+            self.welcome = True
+        if "--page" in args and args.index("--page") + 1 < len(args):
+            self.page = args[args.index("--page") + 1]
+        self.activate()
+        return 0
+
+    def do_activate(self):
+        prov = Gtk.CssProvider()
+        prov.load_from_data(CSS)
+        Gtk.StyleContext.add_provider_for_display(Gdk.Display.get_default(), prov, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
+        win = self.props.active_window or Window(self, self.page, self.welcome)
+        if self.page and isinstance(win, Window):
+            win.stack.set_visible_child_name(self.page)
+        win.present()
+
+
+if __name__ == "__main__":
+    if not CREED or not os.path.exists(CREED):
+        print("creed-settings: the `creed` command is not installed", file=sys.stderr)
+        sys.exit(1)
+    sys.exit(App().run(sys.argv))

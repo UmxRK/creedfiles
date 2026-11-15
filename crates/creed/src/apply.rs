@@ -147,6 +147,12 @@ pub fn session_start() -> Result<(), String> {
     if !paths.generated().join("hyprland.lua").is_file() {
         apply(None, false)?;
     }
+    // First login after install: open the welcome screen once.
+    let pending = paths.config.join(".welcome-pending");
+    if pending.exists() && have("creed-settings") {
+        let _ = fs::remove_file(&pending);
+        let _ = Command::new("creed-settings").arg("--welcome").stdin(Stdio::null()).stdout(Stdio::null()).stderr(Stdio::null()).spawn();
+    }
     // Wait for the shell, then export the lock-screen wallpaper.
     for _ in 0..50 {
         if crate::shell_ipc("ping").is_ok() {
