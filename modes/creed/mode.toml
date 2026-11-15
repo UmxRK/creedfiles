@@ -1,0 +1,60 @@
+# Creed - the original look. Soft, playful, warm.
+
+[meta]
+name = "Creed"
+family = "creed"
+description = "Creed's own look: soft rounded pills, warm colours from your wallpaper and springy motion."
+preview = "preview.png"
+
+[appearance]
+color_source = "wallpaper"
+wallpaper = "creed://dawn"
+motion = "expressive"
+
+[bar]
+position = "top"
+style = "floating"
+size = 38
+margin = 8
+radius = 19
+left = ["launcher", "workspaces", "window"]
+center = ["clock"]
+right = ["tray", "media", "network", "bluetooth", "volume", "battery", "notifications", "control"]
+clock_format = "%H:%M"
+date_format = "%a %d %b"
+
+[dock]
+enabled = true
+position = "bottom"
+icon_size = 44
+magnify = 1.0
+margin = 8
+
+[glass]
+refraction = 0.0
+frost = 0.78
+specular = 0.25
+
+[style]
+radius = 18
+radius_small = 11
+spacing = 8
+padding = 12
+material = "frost"
+window_mode = "tile"
+titlebar = "none"
+icon_theme = "Papirus-Dark"
+cursor_theme = "Adwaita"
+gtk_theme = "adw-gtk3-dark"
+bar = "creed"
+dock = "creed"
+launcher = "creed"
+control = "creed"
+overview = "creed"
+dashboard = "creed"
+notifications = "creed"
+osd = "creed"
+window_gaps_in = 5
+window_gaps_out = 12
+window_rounding = 16
+window_border = 2

@@ -1,0 +1,5 @@
+# Creed defaults. Do not edit - put your changes in ~/.config/creed/overrides.toml
+# (or use the Creed Settings app, which writes there for you).
+
+[general]
+mode = "creed"

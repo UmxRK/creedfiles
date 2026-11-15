@@ -1,0 +1,14 @@
+[package]
+name = "creed-shot"
+version = "0.1.0"
+edition = "2021"
+publish = false
+description = "Test helper: screenshot a wlroots output via wlr-screencopy (used by the test suite only)."
+
+[dependencies]
+wayland-client = "0.31"
+wayland-protocols-wlr = { version = "0.3", features = ["client"] }
+image = { version = "0.25", default-features = false, features = ["png"] }
+libc = "0.2"
+
+[workspace]
