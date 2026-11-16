@@ -34,7 +34,7 @@ margin = 8
 
 [glass]
 refraction = 0.55
-thickness = 14
+thickness = 28
 roughness = 0.08
 frost = 0.32
 specular = 0.55

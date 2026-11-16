@@ -185,7 +185,12 @@ impl Theme {
         let p = &self.pal;
         let st = &self.cfg.style;
         if st.shadow > 0.0 {
-            shadow(cr, r, radius, 10.0, 3.0, st.shadow);
+            if st.material == Material::Glass && self.cfg.glass.enabled {
+                // Liquid Glass casts a wide, faint shadow rather than a dark halo.
+                shadow(cr, r, radius, 16.0, 5.0, st.shadow * 0.6);
+            } else {
+                shadow(cr, r, radius, 10.0, 3.0, st.shadow);
+            }
         }
         let glass_on = self.cfg.glass.enabled;
         let (tint, frost, specular) = self.cfg.glass_for(element);
@@ -207,42 +212,76 @@ impl Theme {
                 }
             }
             Material::Glass => {
-                // Liquid glass: very light fill, bright rim, specular sheen. Above 0.5 frost the
-                // fill thickens quickly, so heavily frosted parts (menus) stay readable over anything.
+                // Apple Liquid Glass. The compositor supplies the refraction/blur of what is
+                // behind (Hyprland glass blur); here we draw what makes it read as a thick, clear
+                // lens: a nearly clear body, a bright lensing band just inside the edge that fades
+                // to the centre, a thin directional rim (light from the top-left, catching again
+                // at the bottom-right), a faint inner shadow under the rim, and a soft highlight
+                // that follows the pointer.
                 let fill = (frost * 0.55 + (frost - 0.5).max(0.0) * 0.9).min(0.92);
                 fill_rounded(cr, r, radius, base.with_alpha(fill));
                 fill_rounded(cr, r, radius, tint);
-                // inner glow at edges (lens thickness)
+                let (hi, lo) = if self.dark { (1.0, 0.55) } else { (1.0, 0.8) };
+                cr.save().ok();
                 rounded(cr, r, radius);
-                let edge = LinearGradient::new(r.x, r.y, r.x, r.bottom());
-                let hi = if self.dark { 0.10 } else { 0.22 };
-                edge.add_color_stop_rgba(0.0, 1.0, 1.0, 1.0, hi * specular * 2.0);
-                edge.add_color_stop_rgba(0.35, 1.0, 1.0, 1.0, 0.0);
-                edge.add_color_stop_rgba(1.0, 1.0, 1.0, 1.0, hi * specular);
-                let _ = cr.set_source(&edge);
+                cr.clip();
+                // Lensing band: light gathers at the curved edge of the glass.
+                let band = (radius.min(r.h / 2.0) * 0.55).clamp(4.0, 14.0);
+                let steps = 7;
+                for k in 0..steps {
+                    let t = k as f64 / steps as f64;
+                    let d = band * t;
+                    let a = (if self.dark { 0.055 } else { 0.09 }) * (1.0 - t).powi(2) * (0.6 + specular);
+                    stroke_rounded(cr, r.inset(d), (radius - d).max(0.0), band / steps as f64 + 0.6, Color::rgba(1.0, 1.0, 1.0, a));
+                }
+                // Soft brighter top, as on the real material.
+                let top = LinearGradient::new(r.x, r.y, r.x, r.y + r.h.min(80.0));
+                top.add_color_stop_rgba(0.0, 1.0, 1.0, 1.0, if self.dark { 0.05 } else { 0.10 });
+                top.add_color_stop_rgba(1.0, 1.0, 1.0, 1.0, 0.0);
+                cr.rectangle(r.x, r.y, r.w, r.h.min(80.0));
+                let _ = cr.set_source(&top);
                 let _ = cr.fill();
+                // Pointer-following sheen (subtle - Liquid Glass reacts, it doesn't glow).
                 if specular > 0.0 {
                     let (sx, sy) = match (pointer, self.cfg.glass.specular_follow_cursor) {
                         (Some((x, y)), true) if r.contains(x, y) => (x, y),
-                        _ => (r.x + r.w * 0.25, r.y),
+                        _ => (r.x + r.w * 0.22, r.y),
                     };
-                    let rad = (r.w.max(r.h) * 0.6).max(40.0);
+                    let rad = (r.w.max(r.h) * 0.55).max(40.0);
                     let g = RadialGradient::new(sx, sy, 0.0, sx, sy, rad);
-                    g.add_color_stop_rgba(0.0, 1.0, 1.0, 1.0, 0.16 * specular);
+                    g.add_color_stop_rgba(0.0, 1.0, 1.0, 1.0, 0.09 * specular);
                     g.add_color_stop_rgba(1.0, 1.0, 1.0, 1.0, 0.0);
-                    rounded(cr, r, radius);
+                    cr.rectangle(r.x, r.y, r.w, r.h);
                     let _ = cr.set_source(&g);
                     let _ = cr.fill();
                 }
-                // Rim: lighter on top, faint below - like light caught on a lens edge.
-                let rim = LinearGradient::new(r.x, r.y, r.x, r.bottom());
-                rim.add_color_stop_rgba(0.0, 1.0, 1.0, 1.0, 0.55 * specular.max(0.2));
-                rim.add_color_stop_rgba(0.5, 1.0, 1.0, 1.0, 0.08);
-                rim.add_color_stop_rgba(1.0, 1.0, 1.0, 1.0, 0.25 * specular.max(0.2));
-                rounded(cr, r.inset(0.5), (radius - 0.5).max(0.0));
-                let _ = cr.set_source(&rim);
-                cr.set_line_width(1.0);
-                let _ = cr.stroke();
+                // Inner shadow under the rim along the bottom edge (thickness).
+                let sh = LinearGradient::new(r.x, r.bottom() - 6.0, r.x, r.bottom());
+                sh.add_color_stop_rgba(0.0, 0.0, 0.0, 0.0, 0.0);
+                sh.add_color_stop_rgba(1.0, 0.0, 0.0, 0.0, if self.dark { 0.18 } else { 0.06 });
+                cr.rectangle(r.x, r.bottom() - 6.0, r.w, 6.0);
+                let _ = cr.set_source(&sh);
+                let _ = cr.fill();
+                cr.restore().ok();
+                // Directional rim: bright at the top-left, dim along the sides, catching again at
+                // the bottom-right; a second, fainter rim one pixel in gives the edge its depth.
+                let s = specular.max(0.25);
+                for (inset, k) in [(0.5, 1.0), (1.5, 0.35)] {
+                    let rim = LinearGradient::new(r.x, r.y, r.right(), r.bottom());
+                    rim.add_color_stop_rgba(0.0, 1.0, 1.0, 1.0, (0.95 * s * k * hi).min(1.0));
+                    rim.add_color_stop_rgba(0.28, 1.0, 1.0, 1.0, 0.22 * k * hi);
+                    rim.add_color_stop_rgba(0.55, 1.0, 1.0, 1.0, 0.08 * k);
+                    rim.add_color_stop_rgba(0.82, 1.0, 1.0, 1.0, 0.22 * k * lo);
+                    rim.add_color_stop_rgba(1.0, 1.0, 1.0, 1.0, (0.7 * s * k * lo).min(1.0));
+                    rounded(cr, r.inset(inset), (radius - inset).max(0.0));
+                    let _ = cr.set_source(&rim);
+                    cr.set_line_width(1.0);
+                    let _ = cr.stroke();
+                }
+                // Hairline separation from bright backgrounds (light mode only).
+                if !self.dark {
+                    stroke_rounded(cr, Rect::new(r.x - 0.5, r.y - 0.5, r.w + 1.0, r.h + 1.0), radius + 0.5, 0.5, Color::rgba(0.0, 0.0, 0.0, 0.10));
+                }
                 return;
             }
             Material::Aqua => {

@@ -488,6 +488,7 @@ pub fn procedural_seed(name: &str) -> Option<palette::Seed> {
         "ribbon" => s(240.0, 220.0),
         "dunes" => s(55.0, 30.0),
         "horizon" => s(260.0, 320.0),
+        "tahoe" => s(255.0, 70.0),
         "aurora" => s(290.0, 200.0),
         "aqua" => s(245.0, 220.0),
         _ => return None,

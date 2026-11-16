@@ -31,7 +31,7 @@ BAR_MODULES = ["launcher", "workspaces", "window", "appmenu", "taskbar", "search
                "weather", "keyboard", "gamemode", "notifications", "control", "power", "spacer"]
 
 PROCEDURAL = [("creed://dawn", "Creed Dawn"), ("creed://dusk", "Creed Dusk"), ("creed://bloom", "Bloom"),
-              ("creed://ribbon", "Ribbon"), ("creed://dunes", "Dunes"), ("creed://horizon", "Horizon"),
+              ("creed://ribbon", "Ribbon"), ("creed://dunes", "Dunes"), ("creed://horizon", "Horizon"), ("creed://tahoe", "Tahoe"),
               ("creed://aurora", "Aurora"), ("creed://aqua", "Aqua")]
 
 PRESETS = ["ember", "blossom", "dusk", "frost", "moss", "sand", "mono"]

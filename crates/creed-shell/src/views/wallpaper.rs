@@ -14,6 +14,7 @@ pub const PROCEDURAL: &[(&str, &str)] = &[
     ("ribbon", "Ribbon - beams of light in blue"),
     ("dunes", "Dunes - layered desert hills"),
     ("horizon", "Horizon - liquid colour waves"),
+    ("tahoe", "Tahoe - blue wave under a warm sky"),
     ("aurora", "Aurora - colourful curves"),
     ("aqua", "Aqua - glossy blue swirl"),
 ];
@@ -27,6 +28,7 @@ pub fn procedural_seed(name: &str) -> Option<Seed> {
         "ribbon" => s(240.0, 220.0),
         "dunes" => s(55.0, 30.0),
         "horizon" => s(260.0, 320.0),
+        "tahoe" => s(255.0, 70.0),
         "aurora" => s(290.0, 200.0),
         "aqua" => s(245.0, 220.0),
         _ => return None,
@@ -103,6 +105,118 @@ fn grain(cr: &Context, strength: f64) {
     let _ = cr.paint_with_alpha(strength);
 }
 
+/// Folded-fabric flower in the spirit of Windows 11's Bloom: two rings of curved petals, each
+/// shaded from a deep base to a bright rim, layered back to front on a navy (or pale) ground.
+fn draw_bloom(cr: &Context, w: f64, h: f64, dark: bool) {
+    let m = w.min(h * 1.6);
+    if dark {
+        vgrad(cr, w, h, &[(0.0, c("#060d1f")), (0.55, c("#0a1630")), (1.0, c("#040915"))]);
+        blob(cr, w * 0.5, h * 0.55, m * 0.55, c("#0d2a6a88"));
+    } else {
+        vgrad(cr, w, h, &[(0.0, c("#c9dcf2")), (1.0, c("#9fbedf"))]);
+        blob(cr, w * 0.5, h * 0.5, m * 0.6, c("#e8f1fbaa"));
+    }
+    let (cx, cy) = (w * 0.5, h * 0.6);
+    // (count, length, width, rotation offset, base colour, rim colour)
+    let rings: [(usize, f64, f64, f64, &str, &str); 3] = [
+        (9, 0.44, 0.20, 0.10, "#0a1f8c", "#2f6bff"),
+        (8, 0.36, 0.19, 0.42, "#0b2fb8", "#4d8dff"),
+        (7, 0.26, 0.17, 0.05, "#1442d6", "#79b4ff"),
+    ];
+    for (n, len, wid, off, base, rim) in rings {
+        for k in 0..n {
+            let a = off + k as f64 / n as f64 * std::f64::consts::TAU;
+            let (l, wd) = (m * len, m * wid);
+            cr.save().ok();
+            cr.translate(cx, cy);
+            cr.scale(1.0, 0.78);
+            cr.rotate(a);
+            // Petal: a cupped lobe whose outer edge curls (two offset curves).
+            let petal = |cr: &Context, grow: f64| {
+                cr.new_path();
+                cr.move_to(0.0, 0.0);
+                cr.curve_to(l * 0.25, -wd * 0.9 * grow, l * 0.85, -wd * 0.75 * grow, l * grow, -wd * 0.05);
+                cr.curve_to(l * 0.9, wd * 0.55 * grow, l * 0.35, wd * 0.45 * grow, 0.0, 0.0);
+                cr.close_path();
+            };
+            // Soft shadow beneath for depth.
+            petal(cr, 1.04);
+            cr.set_source_rgba(0.0, 0.02, 0.1, if dark { 0.45 } else { 0.10 });
+            let _ = cr.fill();
+            petal(cr, 1.0);
+            let g = LinearGradient::new(0.0, 0.0, l, -wd * 0.3);
+            let (b, r) = (c(base), c(rim));
+            g.add_color_stop_rgba(0.0, b.r * 0.6, b.g * 0.6, b.b * 0.8, 1.0);
+            g.add_color_stop_rgba(0.55, b.r, b.g, b.b, 1.0);
+            g.add_color_stop_rgba(1.0, r.r, r.g, r.b, 1.0);
+            let _ = cr.set_source(&g);
+            let _ = cr.fill_preserve();
+            // Folded highlight along the upper edge.
+            cr.new_path();
+            cr.move_to(l * 0.2, -wd * 0.55);
+            cr.curve_to(l * 0.55, -wd * 0.78, l * 0.85, -wd * 0.62, l * 0.98, -wd * 0.08);
+            cr.set_line_width(m * 0.006);
+            cr.set_source_rgba(0.75, 0.88, 1.0, 0.55);
+            let _ = cr.stroke();
+            cr.restore().ok();
+        }
+    }
+    blob(cr, cx, cy - m * 0.02, m * 0.09, c("#9cc8ff66"));
+}
+
+/// macOS 26-style wave: a pale sky (blue fading to warm cream) cut by a sweeping S-curve of deep
+/// blue glass with a bright, glossy edge line; a cool night variant for dark mode.
+fn draw_tahoe(cr: &Context, w: f64, h: f64, dark: bool) {
+    let sky: [(f64, &str); 3] = if dark { [(0.0, "#0b1a3a"), (0.5, "#1b2a52"), (1.0, "#2a3c66")] } else { [(0.0, "#7fa9dd"), (0.42, "#c9cbd3"), (0.72, "#e7dcae")] };
+    let g = LinearGradient::new(0.0, 0.0, w * 0.1, h * 0.8);
+    for (o, col) in sky {
+        let k = c(col);
+        g.add_color_stop_rgba(o, k.r, k.g, k.b, 1.0);
+    }
+    cr.rectangle(0.0, 0.0, w, h);
+    let _ = cr.set_source(&g);
+    let _ = cr.fill();
+    // Distant soft hills on the left.
+    blob(cr, w * 0.08, h * 0.5, w * 0.22, if dark { c("#1e6fb5aa") } else { c("#22a6d9cc") });
+    blob(cr, w * 0.22, h * 0.62, w * 0.25, if dark { c("#1c4fa0aa") } else { c("#1f6fe0bb") });
+    // The wave: everything right of / below the S-curve is deep blue.
+    let curve = |cr: &Context| {
+        cr.move_to(-w * 0.02, h * 0.92);
+        cr.curve_to(w * 0.28, h * 0.78, w * 0.42, h * 0.38, w * 0.62, h * 0.18);
+        cr.curve_to(w * 0.7, h * 0.1, w * 0.78, h * 0.02, w * 0.84, -h * 0.02);
+    };
+    cr.new_path();
+    curve(cr);
+    cr.line_to(w * 1.02, -h * 0.02);
+    cr.line_to(w * 1.02, h * 1.02);
+    cr.line_to(-w * 0.02, h * 1.02);
+    cr.close_path();
+    let body = LinearGradient::new(w * 0.45, h * 0.2, w * 0.8, h);
+    let stops: [(f64, &str); 4] = if dark {
+        [(0.0, "#2a63c9"), (0.3, "#173f9e"), (0.7, "#0b2470"), (1.0, "#06143f")]
+    } else {
+        [(0.0, "#62b7ef"), (0.25, "#2a7ae8"), (0.65, "#0b4bd0"), (1.0, "#0835a8")]
+    };
+    for (o, col) in stops {
+        let k = c(col);
+        body.add_color_stop_rgba(o, k.r, k.g, k.b, 1.0);
+    }
+    let _ = cr.set_source(&body);
+    let _ = cr.fill();
+    // Inner swell and a pale mass at the bottom right, like light inside thick glass.
+    blob(cr, w * 0.62, h * 0.48, w * 0.28, if dark { c("#2f6fd055") } else { c("#6cb6ff66") });
+    blob(cr, w * 0.95, h * 0.95, w * 0.32, if dark { c("#3a4f8066") } else { c("#cfe0f5aa") });
+    // Glossy edge: a wide soft glow plus a crisp white line along the curve.
+    for (lw, a) in [(w * 0.018, 0.18), (w * 0.006, 0.45), (w * 0.0016, 0.95)] {
+        cr.new_path();
+        curve(cr);
+        cr.set_line_width(lw);
+        cr.set_line_cap(cairo::LineCap::Round);
+        cr.set_source_rgba(1.0, 1.0, 1.0, if dark { a * 0.6 } else { a });
+        let _ = cr.stroke();
+    }
+}
+
 pub fn draw_procedural(cr: &Context, name: &str, w: f64, h: f64, dark: bool) {
     draw_procedural_inner(cr, name, w, h, dark);
     grain(cr, if dark { 0.035 } else { 0.03 });
@@ -123,23 +237,8 @@ fn draw_procedural_inner(cr: &Context, name: &str, w: f64, h: f64, dark: bool) {
             blob(cr, w * 0.2, h * 0.85, m * 0.45, c("#6a4bc0aa"));
             blob(cr, w * 0.5, h * 1.05, m * 0.4, c("#f08a6a88"));
         }
-        "bloom" => {
-            let stops: Vec<(f64, Color)> = if dark { [(0.0, c("#0b1426")), (1.0, c("#14213d"))].to_vec() } else { [(0.0, c("#dfe9f7")), (1.0, c("#c4d7f2"))].to_vec() };
-            vgrad(cr, w, h, &stops);
-            let (cx, cy) = (w * 0.5, h * 0.56);
-            for k in 0..6 {
-                let a = k as f64 / 6.0 * std::f64::consts::TAU - 0.4;
-                let (px, py) = (cx + a.cos() * m * 0.09, cy + a.sin() * m * 0.07);
-                let col = if k % 2 == 0 { c("#3d7bf0cc") } else { c("#6aa8ffcc") };
-                cr.save().ok();
-                cr.translate(px, py);
-                cr.rotate(a);
-                cr.scale(1.0, 0.42);
-                blob(cr, 0.0, 0.0, m * 0.22, col);
-                cr.restore().ok();
-            }
-            blob(cr, cx, cy, m * 0.12, c("#cfe3ffaa"));
-        }
+        "bloom" => draw_bloom(cr, w, h, dark),
+        "tahoe" => draw_tahoe(cr, w, h, dark),
         "ribbon" => {
             vgrad(cr, w, h, &[(0.0, c("#03122b")), (1.0, c("#06244f"))]);
             for (i, alpha) in [(0, 0.55), (1, 0.4), (2, 0.28)] {
