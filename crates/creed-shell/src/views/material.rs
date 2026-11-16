@@ -285,8 +285,7 @@ pub fn draw_module(ui: &mut Ui, name: &str, r: Rect, data: &Data) -> bool {
                 x = tx + tw + 10.0;
                 label.push(format!("{what} {}", pct(v)));
             }
-            ui.hit(key, r, Action::Exec("btop-launch".into()), Role::Label, label.join(", "));
-            ui.hits.last_mut().map(|h| h.action = Action::Toggle(Kind::Dashboard));
+            ui.hit(key, r, Action::Toggle(Kind::Dashboard), Role::Button, label.join(", "));
         }
         "media" => {
             group_pill(ui, r);

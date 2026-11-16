@@ -73,10 +73,10 @@ Creed settings in `~/.config/creed` are kept in case you come back.
 
 | Mode | Look |
 |---|---|
-| `creed` | Soft rounded pills, warm colours from your wallpaper, springy motion, floating top bar and dock |
+| `creed` | Material You (in the style of end-4's illogical-impulse): colours from your wallpaper via Material 3, a flush bar with resources, media, workspaces and status, rounded screen corners, full-height sidebars for quick settings, notifications, the calendar, a to-do list and widgets |
 | `win11` | Centred taskbar, Mica, rounded windows, Start with pinned apps, Snap Layouts, Widgets, Task View |
 | `win10` | Left taskbar with search box, Acrylic, square corners, tiled Start, full-height Action Center |
-| `mac-tahoe` | Liquid Glass bar, dock and panels with refraction and a moving edge highlight, magnifying dock |
+| `mac-tahoe` | Liquid Glass: transparent menu bar, glass dock, Spotlight that grows into one glass panel, Spotlight clipboard, desktop widgets, Tahoe lock screen |
 | `mac-sequoia` | Frosted vibrancy menu bar, Control Center, Mission Control, magnifying dock |
 | `mac-bigsur` | Bright Big Sur style: light appearance and a soft translucent menu bar |
 | `mac-aqua` | Pinstripes, glossy menu bar and the reflective shelf dock |
@@ -126,15 +126,42 @@ not loose re-imaginings.
 - Menu bar: 24 px, 13 pt.
 - Control Center: 320 px, with the module layout of Wi-Fi/Bluetooth, Focus, Display, Sound
   and Now Playing.
-- Spotlight: the Sequoia field, or the Tahoe glass pill with its four shortcut buttons.
+- Spotlight: the Sequoia field, or Tahoe's glass capsule that grows into one panel with
+  results, with Apps / Files / Actions / Clipboard buttons revealed on hover.
+- Tahoe extras: desktop widgets (weather with an hourly forecast, calendar, battery,
+  shortcuts), the Spotlight clipboard history, and the lock screen with the date over a
+  large clock.
 - Notification Center: banners with widgets underneath.
 - Volume HUD: the top-right slider.
 - Dock: magnification and running dots.
 - Status glyphs (Wi-Fi, battery, Control Center, Spotlight, sound) are drawn as vectors,
   because SF Symbols may not be redistributed.
 
-**Not included:** the Windows and Apple logos, Apple's fonts, and the official wallpapers
-can't legally be shipped. Neutral stand-ins take their place.
+**Creed**
+- Colours are Material 3's TonalSpot scheme (Google's own `material-color-utilities`
+  algorithm, the same one matugen uses), seeded from your wallpaper.
+- Icons are Google's **Material Symbols Rounded** (Apache-2.0), shipped as `Creed-Material`.
+- Text is set in Rubik (downloaded with the mode assets), otherwise Inter.
+
+### Look-alike assets (optional download)
+
+Creed itself ships only its own artwork. The installer offers to download free look-alike
+themes from their open-source projects into your home folder (no admin rights, about
+250 MB). Run it any time with `creed assets`.
+
+| For | Downloaded |
+|---|---|
+| Windows | Selawik font, Win11 icon theme, Fluent GTK theme and cursors, Bloom wallpapers (Win11OS-kde) |
+| macOS | MacTahoe and WhiteSur icon themes, MacTahoe GTK theme and cursors, Tahoe, Big Sur, Monterey, Ventura and Sonoma wallpapers |
+| Creed | Rubik and Gabarito fonts |
+
+Each mode lists its preferred themes with fallbacks (for example
+`icon_theme = "MacTahoe{-dark}, WhiteSur{-dark}, Papirus-{Scheme}"`), so it uses the
+look-alike when present and a sensible default when not. Without the photos, every mode
+draws its own wallpaper: a Tahoe-style blue wave, a folded-petal Bloom, and so on.
+
+Creed never ships the Windows or Apple logos, Apple's fonts or official wallpapers itself.
+Screenshots in this README are rendered without the downloaded assets.
 
 ### Liquid Glass and other materials
 
@@ -145,8 +172,17 @@ The Glass page in Settings exposes every control:
 - shine strength, and whether the shine follows the pointer
 - separate frost and shine values for the bar, dock, launcher, control center and notifications
 
-Hyprland 0.57's built-in glass and acrylic blur do the refraction. Creed adds the panel
-tint, rim light and specular highlight on top.
+Hyprland 0.57's built-in glass and acrylic blur do the refraction of what is behind a
+panel. Creed draws the rest of Apple's material on top:
+- a nearly clear body;
+- a bright lensing band just inside the edge;
+- a thin directional rim, brightest at the top-left and catching again at the bottom-right,
+  with a fainter inner rim;
+- an inner shadow along the bottom;
+- a wide, faint shadow;
+- a subtle sheen that follows the pointer.
+
+Menus are frosted much more heavily than panels, so they stay readable over anything.
 
 Quality is set to **Automatic** by default. On integrated or weak GPUs it switches to a
 cheap frosted blur that keeps the look. You can force any tier from Low to Ultra.
@@ -306,8 +342,14 @@ Hyprland's own `--verify-config`:
 - apply → re-apply → status → revert for every tweak, with a byte-for-byte restore check
 - a check that cleanups delete only caches
 - setup → uninstall restoring a user's original files
+- generated app themes checked by the apps' own parsers (foot, starship, Lua, Qt, …)
+- the CLI: every command, bad input (non-zero exit, a message, never a panic) and config
+  round trips
+- Creed Settings: every page, edits reaching the config, the welcome flow
+- screen-reader support: every control reaching AT-SPI with a name, in every mode
+- the SDDM login themes rendered by the real greeter
 - the memory gate
-- screenshots of every surface in every mode
+- screenshots of every surface in every mode, including OSDs and app menus
 
 Layout:
 
@@ -322,6 +364,8 @@ Layout:
 | `tweaks/` | The tweak catalogue (`tweak.toml` plus apply / revert / status / plan scripts) |
 | `helper/`, `packaging/` | Root helper, polkit rule, desktop entry, PKGBUILD |
 | `sddm/` | Login screens (Creed, Windows, macOS layouts) |
+| `icons/` | `Creed-Fluent` (Fluent System Icons, MIT) and `Creed-Material` (Material Symbols, Apache-2.0) |
+| `scripts/` | Look-alike asset download, hyprbars build, Material icon generator |
 
 ## Known limits
 
@@ -341,3 +385,5 @@ Layout:
 ## Licence
 
 GPL-3.0-or-later. Emoji data © Unicode, Inc. (Unicode License v3); see `crates/creed-shell/data/NOTICE`.
+Bundled icon sets keep their own licences (`icons/*/LICENSE`). Downloaded look-alike assets
+belong to their projects and are not part of Creed.

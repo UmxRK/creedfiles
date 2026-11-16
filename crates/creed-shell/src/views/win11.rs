@@ -154,17 +154,6 @@ pub fn lang_lines(layout: &str) -> (String, String) {
     }
 }
 
-#[cfg(test)]
-mod lang_tests {
-    #[test]
-    fn indicator() {
-        assert_eq!(super::lang_lines("English (UK)"), ("ENG".into(), "UK".into()));
-        assert_eq!(super::lang_lines("English (US)"), ("ENG".into(), "US".into()));
-        assert_eq!(super::lang_lines("us"), ("ENG".into(), "US".into()));
-        assert_eq!(super::lang_lines("German"), ("DEU".into(), "".into()));
-        assert_eq!(super::lang_lines("Czech"), ("CZE".into(), "".into()));
-    }
-}
 
 /// Draws one Windows 11 taskbar module; returns false if the module is not a Win11 one.
 pub fn draw_module(ui: &mut Ui, name: &str, r: Rect, data: &Data) -> bool {
@@ -820,4 +809,16 @@ pub fn task_view(ui: &mut Ui, data: &Data, views: &mut Views) {
     ui.text(Rect::new(add.x, strip.y + 8.0, tw, 22.0), "New desktop", &Text::new(CAPTION, Color::rgba(1.0, 1.0, 1.0, 0.95)));
     ui.text(add, "+", &Text::new(28.0, Color::rgba(1.0, 1.0, 1.0, 0.9)).center());
     ui.hit(ak, add, Action::Hypr("hl.dsp.focus({ workspace = \"empty\" })".into()), Role::Button, "New desktop");
+}
+
+#[cfg(test)]
+mod lang_tests {
+    #[test]
+    fn indicator() {
+        assert_eq!(super::lang_lines("English (UK)"), ("ENG".into(), "UK".into()));
+        assert_eq!(super::lang_lines("English (US)"), ("ENG".into(), "US".into()));
+        assert_eq!(super::lang_lines("us"), ("ENG".into(), "US".into()));
+        assert_eq!(super::lang_lines("German"), ("DEU".into(), "".into()));
+        assert_eq!(super::lang_lines("Czech"), ("CZE".into(), "".into()));
+    }
 }
