@@ -24,6 +24,7 @@ pub mod overview;
 pub mod power;
 pub mod snap;
 pub mod wallpaper;
+pub mod widgets;
 
 use crate::data::{AppEntry, Data};
 use crate::gfx::{self, Rect, Text};
@@ -311,6 +312,7 @@ pub fn spec(kind: Kind, th: &gfx::Theme, data: &Data, views: &Views, ow: u32, oh
         Kind::Power => Spec { ..Spec::popup_full("creed-power") },
         Kind::Snap => Spec { ..Spec::popup_full("creed-snap") },
         Kind::Calendar => Spec { keyboard: KeyboardInteractivity::OnDemand, ..Spec::popup_full("creed-calendar") },
+        Kind::Desktop => widgets::spec(th, data),
     }
     .with_cfg(cfg)
 }
@@ -388,6 +390,7 @@ pub fn draw(ui: &mut Ui, kind: Kind, closing: bool, data: &Data, views: &mut Vie
         Kind::Snap => snap::draw(ui, closing, data, views),
         Kind::Menu => menu::draw(ui, closing, data, views),
         Kind::Calendar => calendar::draw_popup(ui, closing, views),
+        Kind::Desktop => widgets::draw(ui, data),
     }
 }
 

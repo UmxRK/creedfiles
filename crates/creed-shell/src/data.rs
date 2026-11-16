@@ -121,6 +121,8 @@ pub struct WeatherNow {
     pub icon: String,
     pub place: String,
     pub hi_lo: String,
+    /// Next forecast slots: (hour of day 0–23, temperature "12°", icon).
+    pub hourly: Vec<(u32, String, String)>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

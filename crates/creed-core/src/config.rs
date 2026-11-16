@@ -325,6 +325,9 @@ pub struct Style {
     /// Icon set the shell uses for its own `-symbolic` glyphs before the app icon theme
     /// (Fluent System Icons for Windows modes, Material Symbols for Creed).
     pub shell_icons: Option<String>,
+    /// Widgets drawn on the desktop under windows (macOS 26): weather, calendar, battery,
+    /// system, shortcuts. Empty = none.
+    pub desktop_widgets: Vec<String>,
     pub font: Option<String>,
     pub scheme: Option<Scheme>,
     pub palette: Option<String>,
@@ -359,6 +362,7 @@ impl Default for Style {
             cursor_size: 24,
             gtk_theme: "adw-gtk3-dark".into(),
             shell_icons: None,
+            desktop_widgets: vec![],
             font: None,
             scheme: None,
             palette: None,
@@ -559,6 +563,12 @@ impl Config {
         for m in self.bar.left.iter().chain(&self.bar.center).chain(&self.bar.right) {
             if !known.contains(&m.as_str()) {
                 return Err(format!("unknown bar module '{m}' (known: {})", known.join(", ")));
+            }
+        }
+        const WIDGETS: &[&str] = &["weather", "calendar", "battery", "system", "shortcuts"];
+        for w in &self.style.desktop_widgets {
+            if !WIDGETS.contains(&w.as_str()) {
+                return Err(format!("unknown desktop widget '{w}' (known: {})", WIDGETS.join(", ")));
             }
         }
         if !["mode", "creed"].contains(&self.general.keybind_profile.as_str()) {

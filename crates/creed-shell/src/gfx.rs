@@ -207,8 +207,10 @@ impl Theme {
                 }
             }
             Material::Glass => {
-                // Liquid glass: very light fill, bright rim, specular sheen.
-                fill_rounded(cr, r, radius, base.with_alpha(frost * 0.55));
+                // Liquid glass: very light fill, bright rim, specular sheen. Above 0.5 frost the
+                // fill thickens quickly, so heavily frosted parts (menus) stay readable over anything.
+                let fill = (frost * 0.55 + (frost - 0.5).max(0.0) * 0.9).min(0.92);
+                fill_rounded(cr, r, radius, base.with_alpha(fill));
                 fill_rounded(cr, r, radius, tint);
                 // inner glow at edges (lens thickness)
                 rounded(cr, r, radius);

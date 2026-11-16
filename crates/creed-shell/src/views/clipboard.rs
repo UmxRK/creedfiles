@@ -13,6 +13,9 @@ pub fn filtered<'a>(data: &'a Data, q: &str) -> Vec<&'a (String, String)> {
 pub fn draw(ui: &mut Ui, closing: bool, data: &Data, views: &mut Views) {
     let t = open_amount(ui, closing);
     ui.backdrop(Action::Close(Kind::Clipboard));
+    if super::mac::clipboard_tahoe(ui, t, data, views) {
+        return;
+    }
     let th = ui.th;
     let (sw, sh) = ui.size;
     let panel = Rect::new(((sw - 560.0) / 2.0).round(), (sh * 0.16).round(), 560.0, 520.0f64.min(sh * 0.7).round());

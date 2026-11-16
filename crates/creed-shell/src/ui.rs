@@ -43,6 +43,8 @@ pub enum Kind {
     Snap,
     Menu,
     Calendar,
+    /// Desktop widgets (under windows).
+    Desktop,
 }
 
 impl Kind {
@@ -64,6 +66,7 @@ impl Kind {
             "snap" | "snap-layouts" => Kind::Snap,
             "menu" => Kind::Menu,
             "calendar" => Kind::Calendar,
+            "desktop" | "desktop-widgets" => Kind::Desktop,
             _ => return None,
         })
     }
@@ -85,11 +88,12 @@ impl Kind {
             Kind::Snap => "snap",
             Kind::Menu => "menu",
             Kind::Calendar => "calendar",
+            Kind::Desktop => "desktop",
         }
     }
     /// Popups close each other and take keyboard focus.
     pub fn is_popup(&self) -> bool {
-        !matches!(self, Kind::Wallpaper | Kind::Bar | Kind::Dock | Kind::Notifications | Kind::Osd)
+        !matches!(self, Kind::Wallpaper | Kind::Bar | Kind::Dock | Kind::Notifications | Kind::Osd | Kind::Desktop)
     }
 }
 

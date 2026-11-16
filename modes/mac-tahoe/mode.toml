@@ -7,6 +7,7 @@ description = "Liquid Glass: clear, refractive bar, dock and panels with a movin
 preview = "preview.png"
 
 [appearance]
+scheme = "light"
 wallpaper = "creed://tahoe"
 color_source = "preset"
 motion = "expressive"
@@ -48,6 +49,13 @@ frost = 0.22
 [glass.elements.notifications]
 frost = 0.55
 
+[glass.elements.widgets]
+frost = 0.62
+
+# Menus stay readable over anything: Tahoe frosts them far more than panels.
+[glass.elements.menu]
+frost = 0.95
+
 [notifications]
 position = "top-right"
 
@@ -72,6 +80,7 @@ control = "mac"
 overview = "mission"
 dashboard = "mac"
 notifications = "mac"
+desktop_widgets = ["weather", "calendar", "battery", "shortcuts"]
 osd = "mac"
 window_gaps_in = 6
 window_gaps_out = 10

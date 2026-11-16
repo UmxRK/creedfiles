@@ -33,7 +33,24 @@ pub fn parse(json: &str, metric: bool) -> Option<WeatherNow> {
         })
         .unwrap_or_default();
     let hour = crate::time::local(crate::time::now_secs()).hour;
-    Some(WeatherNow { temp: format!("{temp}°"), desc, icon: icon_for(code, !(6..19).contains(&hour)).into(), place, hi_lo })
+    // wttr.in gives 3-hourly slots per day ("0", "300", … "2100"); take the next six from now.
+    let mut hourly = vec![];
+    if let Some(days) = v.get("weather").and_then(|w| w.as_array()) {
+        for (di, d) in days.iter().enumerate().take(2) {
+            for h in d.get("hourly").and_then(|h| h.as_array()).into_iter().flatten() {
+                let t: u32 = h.get("time").and_then(|t| t.as_str()).and_then(|t| t.parse().ok()).unwrap_or(0) / 100;
+                if di == 0 && t <= hour {
+                    continue;
+                }
+                let tk = if metric { "tempC" } else { "tempF" };
+                let (Some(tv), Some(c)) = (h.get(tk).and_then(|x| x.as_str()), h.get("weatherCode").and_then(|x| x.as_str()).and_then(|x| x.parse::<u32>().ok())) else { continue };
+                if hourly.len() < 6 {
+                    hourly.push((t, format!("{tv}°"), icon_for(c, !(6..19).contains(&t)).to_string()));
+                }
+            }
+        }
+    }
+    Some(WeatherNow { temp: format!("{temp}°"), desc, icon: icon_for(code, !(6..19).contains(&hour)).into(), place, hi_lo, hourly })
 }
 
 pub fn spawn(tx: Sender<Msg>, location: String, metric: bool) {
@@ -60,12 +77,17 @@ mod tests {
     #[test]
     fn parses_wttr() {
         let j = r#"{"current_condition":[{"temp_C":"12","temp_F":"54","weatherCode":"116","weatherDesc":[{"value":"Partly cloudy"}]}],
-            "nearest_area":[{"areaName":[{"value":"Leeds"}]}],"weather":[{"maxtempC":"14","mintempC":"6"}]}"#;
+            "nearest_area":[{"areaName":[{"value":"Leeds"}]}],"weather":[{"maxtempC":"14","mintempC":"6",
+            "hourly":[{"time":"2100","tempC":"9","tempF":"48","weatherCode":"113"}]},
+            {"maxtempC":"13","mintempC":"5","hourly":[{"time":"0","tempC":"8","tempF":"46","weatherCode":"116"},{"time":"300","tempC":"7","tempF":"45","weatherCode":"296"}]}]}"#;
         let w = super::parse(j, true).unwrap();
         assert_eq!(w.temp, "12°");
         assert_eq!(w.place, "Leeds");
         assert_eq!(w.hi_lo, "H 14° L 6°");
         assert!(w.icon.starts_with("weather-few-clouds"));
+        // Tomorrow's slots always follow; today's 21:00 only when it is still ahead.
+        assert!(w.hourly.iter().any(|(h, t, i)| *h == 3 && t == "7°" && i == "weather-showers-symbolic"));
+        assert!(w.hourly.len() <= 6);
         assert!(super::parse("{}", true).is_none());
     }
 }

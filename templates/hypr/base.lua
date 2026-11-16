@@ -71,10 +71,10 @@ hl.config({
 ------------------------------ shell layers ----------------------------
 -- Blur / glass behind Creed's own surfaces. ignore_alpha keeps transparent
 -- margins of full-screen popups unblurred.
-hl.layer_rule({ name = "creed-glass", match = { namespace = "^creed-(bar|dock|launcher|control|dashboard|notif-center|notifications|clipboard|emoji|power|snap|menu|calendar|osd)$" }, blur = {{ glass.layers }}, ignore_alpha = 0.02 })
+hl.layer_rule({ name = "creed-glass", match = { namespace = "^creed-(bar|dock|launcher|control|dashboard|notif-center|notifications|clipboard|emoji|power|snap|menu|calendar|osd|widgets)$" }, blur = {{ glass.layers }}, ignore_alpha = 0.02 })
 hl.layer_rule({ name = "creed-overview", match = { namespace = "^creed-overview$" }, blur = {{ glass.layers }}, ignore_alpha = 0.6 })
 hl.layer_rule({ name = "creed-noanim-osd", match = { namespace = "^creed-(osd|notifications)$" }, no_anim = true })
-hl.layer_rule({ name = "creed-wallpaper", match = { namespace = "^creed-wallpaper$" }, no_anim = true })
+hl.layer_rule({ name = "creed-wallpaper", match = { namespace = "^creed-(wallpaper|widgets)$" }, no_anim = true })
 
 ------------------------------ windows ---------------------------------
 hl.window_rule({ name = "creed-suppress-maximize", match = { class = ".*" }, suppress_event = "maximize" })

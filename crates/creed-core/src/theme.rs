@@ -408,6 +408,14 @@ pub fn vars(paths: &Paths, cfg: &Config, pal: &Palette, hw: &Hardware, have: &dy
         paths.expand(wp).to_string_lossy().to_string()
     };
     put("lock.wallpaper", lock_wp);
+    // User picture for the macOS-style lock screen: ~/.face, else AccountsService's copy.
+    let user = std::env::var("USER").unwrap_or_default();
+    let avatar = [paths.home.join(".face"), std::path::PathBuf::from(format!("/var/lib/AccountsService/icons/{user}"))]
+        .into_iter()
+        .find(|p| p.is_file())
+        .map(|p| p.to_string_lossy().to_string())
+        .unwrap_or_default();
+    put("lock.avatar", avatar);
     v
 }
 

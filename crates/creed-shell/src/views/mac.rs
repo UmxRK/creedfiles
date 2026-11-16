@@ -556,6 +556,9 @@ fn panel_draw(ui: &mut Ui, mm: &M, r: Rect, base_radius: f64, element: &str) {
 
 pub fn spotlight(ui: &mut Ui, t_open: f64, data: &Data, views: &mut Views) {
     let mm = m(ui);
+    if mm.tahoe {
+        return spotlight_tahoe(ui, t_open, data, views, &mm);
+    }
     let (sw, sh) = ui.size;
     let results = super::launcher::search(&data.apps, &views.query);
     let special = super::launcher::special_label(&views.query);
@@ -640,6 +643,200 @@ pub fn spotlight(ui: &mut Ui, t_open: f64, data: &Data, views: &mut Views) {
     }
 }
 
+
+/// macOS 26 Spotlight: one Liquid Glass capsule that grows into a rounded panel when there are
+/// results (search row, hairline, list), with the Apps / Files / Actions / Clipboard buttons
+/// revealed beside it on hover.
+fn spotlight_tahoe(ui: &mut Ui, t_open: f64, data: &Data, views: &mut Views, mm: &M) {
+    let (sw, sh) = ui.size;
+    let results = super::launcher::search(&data.apps, &views.query);
+    let special = super::launcher::special_label(&views.query);
+    let n = results.len() + special.is_some() as usize;
+    let show = !views.query.is_empty();
+    let rows = n.min(8);
+    let field_h = 52.0;
+    let row_h = 40.0;
+    let w = 640.0f64.min(sw - 300.0).max(360.0);
+    let list_h = if show { if rows == 0 { 56.0 } else { rows as f64 * row_h + 14.0 } } else { 0.0 };
+    let x = ((sw - w) / 2.0).round();
+    let y = (sh * 0.2).round();
+    let field = Rect::new(x, y, w, field_h);
+    super::popup_transform(ui, field, t_open, true);
+    // Container: capsule when empty, 26 px rounded panel when it holds results.
+    let grow = ui.spring(ui::id("tahoe.sp.grow"), list_h, list_h);
+    let whole = Rect::new(x, y, w, field_h + grow);
+    let radius = if grow < 1.0 { field_h / 2.0 } else { 26.0f64.max(field_h / 2.0 - grow * 0.4) };
+    panel(ui, mm, whole, radius, "launcher");
+    ui.record("launcher.panel", whole, None);
+    ui.hit(ui::id("launcher.panel"), whole, Action::None, Role::Group, "");
+    glyph_search(ui.cr, (field.x + 26.0, field.cy()), 18.0, mm.label2);
+    let q = format!("{}{}", views.query, views.preedit);
+    let tr = Rect::new(field.x + 48.0, field.y, field.w - 64.0, field.h);
+    let big = Text::new(19.0, mm.label);
+    if q.is_empty() {
+        gfx::fill_rounded(ui.cr, Rect::new(tr.x, field.cy() - 11.0, 2.0, 22.0), 1.0, mm.accent);
+        ui.text(Rect::new(tr.x + 5.0, tr.y, tr.w - 5.0, tr.h), "Spotlight Search", &Text::new(big.size, mm.label3));
+    } else {
+        let b = ui.text(tr, &q, &big);
+        gfx::fill_rounded(ui.cr, Rect::new(b.right() + 1.0, field.cy() - 11.0, 2.0, 22.0), 1.0, mm.accent);
+    }
+    ui.hit(ui::id("launcher.input"), field, Action::None, Role::Input, "Spotlight Search");
+    // Shortcut buttons fade in while the pointer is near the search row (or one has focus).
+    let btns: [(&str, &str, Action); 4] = [
+        ("view-app-grid-symbolic", "Applications", Action::Exec("creed toggle launchpad".into())),
+        ("folder-documents-symbolic", "Files", Action::Exec(ui.th.cfg.general.file_manager.clone())),
+        ("system-run-symbolic", "Actions", Action::Open(Kind::Snap)),
+        ("edit-paste-symbolic", "Clipboard", Action::Open(Kind::Clipboard)),
+    ];
+    let band = Rect::new(field.x, field.y - 12.0, field.w + 10.0 + 4.0 * 52.0 + 12.0, field.h + 24.0);
+    let keys: Vec<ui::Id> = (0..4).map(|i| ui::idn("mac.sp.btn", i)).collect();
+    let near = ui.pointer.map(|(px, py)| band.contains(px, py)).unwrap_or(false) || keys.iter().any(|k| ui.focus == Some(*k));
+    let reveal = ui.spring(ui::id("tahoe.sp.reveal"), if near { 1.0 } else { 0.0 }, 0.0);
+    for (i, (icon, label, a)) in btns.into_iter().enumerate() {
+        let b = Rect::new(field.right() + 10.0 + i as f64 * 52.0, field.y + 3.0, 46.0, 46.0);
+        if reveal > 0.01 {
+            ui.cr.save().ok();
+            ui.cr.push_group();
+            ui.th.panel(ui.cr, b, 23.0, "launcher", ui.pointer);
+            let hv = ui.hover_amt(keys[i]);
+            if hv > 0.01 {
+                gfx::fill_rounded(ui.cr, b, 23.0, mm.sel.with_alpha(mm.sel.a * hv));
+            }
+            ui.icon(b, icon, 19.0, Some(mm.label));
+            if ui.focus == Some(keys[i]) {
+                ui.th.focus_ring(ui.cr, b, 23.0);
+            }
+            let _ = ui.cr.pop_group_to_source();
+            let _ = ui.cr.paint_with_alpha(reveal);
+            ui.cr.restore().ok();
+        }
+        ui.hit(keys[i], b, a, Role::Button, label);
+    }
+    if !show || grow < field_h * 0.5 {
+        return;
+    }
+    gfx::fill_rounded(ui.cr, Rect::new(x + 16.0, field.bottom(), w - 32.0, 1.0), 0.0, mm.stroke);
+    let list = Rect::new(x + 8.0, field.bottom() + 7.0, w - 16.0, (grow - 14.0).max(0.0));
+    if n == 0 {
+        ui.text(list, "No Results", &Text::new(13.0, mm.label2).center());
+        return;
+    }
+    super::with_clip(ui, list, |ui| {
+        for i in 0..rows {
+            let r = Rect::new(list.x, list.y + i as f64 * row_h, list.w, row_h - 2.0);
+            let sel = views.sel == i;
+            let k = ui::idn("mac.sp.row", i);
+            let hv = ui.hover_amt(k);
+            // Tahoe selection is a soft neutral capsule, not an accent fill.
+            let a = if sel { 1.0 } else { hv * 0.6 };
+            if a > 0.01 {
+                gfx::fill_rounded(ui.cr, r, 12.0, mm.sel.with_alpha((mm.sel.a * 1.4).min(0.5) * a));
+            }
+            let (icon, title, sub) = match (i, special.as_ref()) {
+                (0, Some((t, sub, ic))) => (ic.to_string(), t.clone(), sub.clone()),
+                _ => {
+                    let a = &data.apps[results[i - special.is_some() as usize]];
+                    (a.icon.clone(), a.name.clone(), "Application".to_string())
+                }
+            };
+            ui.icon(Rect::new(r.x + 10.0, r.y, 26.0, r.h), &icon, 26.0, if icon.ends_with("-symbolic") { Some(mm.label) } else { None });
+            ui.text(Rect::new(r.x + 48.0, r.y, r.w - 160.0, r.h), &title, &Text::new(14.0, mm.label));
+            ui.text(Rect::new(r.right() - 120.0, r.y, 108.0, r.h), &sub, &Text::new(12.0, mm.label3).end());
+            ui.hit(k, r, Action::LauncherPick(i), Role::Item, title);
+        }
+    });
+}
+
+/// macOS 26 Spotlight clipboard history: the Spotlight panel with a "Clipboard" field, items with
+/// a document glyph, "Text" caption and a copy button. Returns false outside Tahoe.
+pub fn clipboard_tahoe(ui: &mut Ui, t_open: f64, data: &Data, views: &mut Views) -> bool {
+    let mm = m(ui);
+    if !mm.tahoe || ui.th.cfg.style.launcher != "spotlight" {
+        return false;
+    }
+    let (sw, sh) = ui.size;
+    let w = 640.0f64.min(sw - 40.0);
+    let x = ((sw - w) / 2.0).round();
+    let y = (sh * 0.2).round();
+    let h = 460.0f64.min(sh * 0.6).round();
+    let whole = Rect::new(x, y, w, h);
+    ui.cr.save().ok();
+    ui.cr.push_group();
+    super::popup_transform(ui, whole, t_open, true);
+    panel(ui, &mm, whole, 26.0, "launcher");
+    ui.record("clipboard.panel", whole, None);
+    ui.hit(ui::id("clip.panel"), whole, Action::None, Role::Group, "");
+    let field = Rect::new(x, y, w, 52.0);
+    ui.icon(Rect::new(field.x + 14.0, field.y, 24.0, field.h), "edit-paste-symbolic", 20.0, Some(mm.label2));
+    let q = format!("{}{}", views.query, views.preedit);
+    let tr = Rect::new(field.x + 48.0, field.y, field.w - 100.0, field.h);
+    if q.is_empty() {
+        gfx::fill_rounded(ui.cr, Rect::new(tr.x, field.cy() - 11.0, 2.0, 22.0), 1.0, mm.accent);
+        ui.text(Rect::new(tr.x + 5.0, tr.y, tr.w, tr.h), "Clipboard", &Text::new(19.0, mm.label3));
+    } else {
+        let b = ui.text(tr, &q, &Text::new(19.0, mm.label));
+        gfx::fill_rounded(ui.cr, Rect::new(b.right() + 1.0, field.cy() - 11.0, 2.0, 22.0), 1.0, mm.accent);
+    }
+    ui.hit(ui::id("clip.input"), field, Action::None, Role::Input, "Search clipboard history");
+    // "More" (⋯) button: clear history.
+    let more = Rect::new(field.right() - 42.0, field.cy() - 14.0, 28.0, 28.0);
+    let km = ui::id("clip.more");
+    let hv = ui.hover_amt(km);
+    gfx::stroke_rounded(ui.cr, more, 14.0, 1.2, mm.label2);
+    if hv > 0.01 {
+        gfx::fill_rounded(ui.cr, more, 14.0, mm.sel.with_alpha(mm.sel.a * hv));
+    }
+    for k in 0..3 {
+        gfx::fill_rounded(ui.cr, Rect::centered(more.cx() - 6.0 + k as f64 * 6.0, more.cy(), 2.6, 2.6), 1.3, mm.label2);
+    }
+    ui.hit(km, more, Action::Exec("cliphist wipe".into()), Role::Button, "Clear clipboard history");
+    gfx::fill_rounded(ui.cr, Rect::new(x + 16.0, field.bottom(), w - 32.0, 1.0), 0.0, mm.stroke);
+    let list = Rect::new(x + 8.0, field.bottom() + 7.0, w - 16.0, h - field.h - 14.0);
+    let items = super::clipboard::filtered(data, &views.query);
+    if items.is_empty() {
+        let msg = if data.clips.is_empty() { "Nothing copied yet" } else { "No Results" };
+        ui.text(list, msg, &Text::new(13.0, mm.label2).center());
+    } else {
+        let from = ui.hits.len();
+        let rows = super::list_layout(views, list, items.len(), 46.0, 2.0);
+        let sel = views.sel;
+        super::with_clip(ui, list, |ui| {
+            for (i, r) in rows {
+                let (id, text) = items[i];
+                let one: String = text.split_whitespace().collect::<Vec<_>>().join(" ");
+                let image = one.starts_with("[[ binary data");
+                let k = ui::idn("clip.row", id);
+                let hv = ui.hover_amt(k);
+                let a = if sel == i { 1.0 } else { hv * 0.6 };
+                if a > 0.01 {
+                    gfx::fill_rounded(ui.cr, r, 12.0, mm.sel.with_alpha((mm.sel.a * 1.4).min(0.5) * a));
+                }
+                // Document glyph with the little blue badge.
+                let doc = Rect::new(r.x + 12.0, r.cy() - 13.0, 20.0, 26.0);
+                gfx::fill_rounded(ui.cr, doc, 3.0, Color::WHITE);
+                gfx::stroke_rounded(ui.cr, doc, 3.0, 1.0, Color::rgba(0.0, 0.0, 0.0, 0.18));
+                for l in 0..4 {
+                    gfx::fill_rounded(ui.cr, Rect::new(doc.x + 4.0, doc.y + 6.0 + l as f64 * 4.0, 12.0, 1.4), 0.7, Color::rgba(0.0, 0.0, 0.0, 0.25));
+                }
+                gfx::fill_rounded(ui.cr, Rect::new(doc.right() - 6.0, doc.bottom() - 7.0, 9.0, 9.0), 4.5, mm.accent);
+                let tx = r.x + 46.0;
+                let label = if image { "Image".to_string() } else { one };
+                ui.text(Rect::new(tx, r.y + 4.0, r.w - 100.0, 20.0), &label, &Text::new(13.5, mm.label));
+                ui.text(Rect::new(tx, r.y + 23.0, r.w - 100.0, 18.0), if image { "Image · Copied" } else { "Text · Copied" }, &Text::new(11.5, mm.label3));
+                let cb = Rect::new(r.right() - 36.0, r.cy() - 11.0, 22.0, 22.0);
+                gfx::fill_rounded(ui.cr, cb, 11.0, mm.sel);
+                ui.icon(cb, "edit-copy-symbolic", 12.0, Some(mm.label));
+                ui.hit(k, r, Action::ClipboardPick(id.clone()), Role::Item, label);
+            }
+        });
+        super::clip_hits(ui, from, list);
+    }
+    let _ = ui.cr.pop_group_to_source();
+    let _ = ui.cr.paint_with_alpha(t_open.clamp(0.0, 1.0));
+    ui.cr.restore().ok();
+    true
+}
+
 // ───────────────────────────── notifications ─────────────────────────────
 
 pub fn banner_height(n: &crate::data::Notif) -> f64 {
@@ -718,7 +915,7 @@ pub fn notif_center(ui: &mut Ui, t_open: f64, data: &Data, views: &mut Views) {
     }
     // Widgets: calendar (medium) + weather (small) like the default widget stack.
     let wr = panel_radius(&mm, 20.0);
-    let cal = Rect::new(area.x, y, area.w, 172.0);
+    let cal = Rect::new(area.x, y, area.w, 248.0);
     panel(ui, &mm, cal, wr, "dashboard");
     ui.hit(ui::id("mac.nc.cal"), cal, Action::None, Role::Group, "");
     super::calendar::draw_month(ui, cal.inset(10.0), views.calendar_offset);

@@ -77,6 +77,8 @@ pub enum Msg {
 }
 
 pub struct Surf {
+    /// Buffer-pixel area drawn last frame (popups only): what must be cleared next frame.
+    pub ink: Option<(i32, i32, i32, i32)>,
     pub uid: u64,
     pub kind: Kind,
     pub output: Option<wl_output::WlOutput>,
@@ -346,6 +348,7 @@ impl App {
             pointer: None,
             anims: Anims::default(),
             last_frame: None,
+            ink: None,
             closing: false,
             spec,
             a11y,
@@ -403,13 +406,16 @@ impl App {
                 if cfg.dock.enabled && cfg.style.dock != "none" {
                     want.push((Kind::Dock, o.clone()));
                 }
+                if !cfg.style.desktop_widgets.is_empty() {
+                    want.push((Kind::Desktop, o.clone()));
+                }
             }
         }
         // Remove surfaces that should not exist anymore.
         let stale: Vec<u64> = self
             .surfs
             .iter()
-            .filter(|s| matches!(s.kind, Kind::Wallpaper | Kind::Bar | Kind::Dock))
+            .filter(|s| matches!(s.kind, Kind::Wallpaper | Kind::Bar | Kind::Dock | Kind::Desktop))
             .filter(|s| !want.iter().any(|(k, o)| *k == s.kind && Some(o) == s.output.as_ref()))
             .map(|s| s.uid)
             .collect();
@@ -525,6 +531,7 @@ impl App {
             Some(b) if b.height() == bh && b.stride() == stride && b.canvas(pool).is_some() => Some(b),
             _ => None,
         };
+        let fresh = reuse.is_none();
         let buffer = match reuse {
             Some(b) => b,
             None => match pool.create_buffer(bw, bh, stride, wl_shm::Format::Argb8888) {
@@ -536,17 +543,28 @@ impl App {
             },
         };
         let canvas = buffer.canvas(pool).expect("fresh buffer");
-        canvas.fill(0);
+        // Popups are full-screen surfaces with a small panel on them. They are recorded first,
+        // then only the inked area (plus last frame's) is cleared, rasterised and damaged, so an
+        // animating panel costs its own size, not the whole screen.
+        let partial = s.kind.is_popup();
+        if !partial || fresh || s.ink.is_none() {
+            canvas.fill(0);
+        }
         let now = Instant::now();
         let dt = s.last_frame.map(|t| now.duration_since(t).as_secs_f64()).unwrap_or(0.0);
         s.last_frame = Some(now);
         let (hits, boxes, animating);
+        let mut damage = (0, 0, bw, bh);
         {
             let img = unsafe {
                 cairo::ImageSurface::create_for_data_unsafe(canvas.as_mut_ptr(), cairo::Format::ARgb32, bw, bh, stride)
             };
             let Ok(img) = img else { return };
-            let cr = cairo::Context::new(&img).expect("cairo context");
+            let rec = if partial { cairo::RecordingSurface::create(cairo::Content::ColorAlpha, None).ok() } else { None };
+            let cr = match &rec {
+                Some(r) => cairo::Context::new(r).expect("cairo context"),
+                None => cairo::Context::new(&img).expect("cairo context"),
+            };
             cr.scale(scale, scale);
             self.icons.scale = scale;
             let mut ui = Ui {
@@ -573,6 +591,49 @@ impl App {
             animating = ui.animating;
             drop(ui);
             drop(cr);
+            if let Some(rec) = rec {
+                let (x, y, w2, h2) = rec.ink_extents();
+                let cur = if w2 > 0.0 && h2 > 0.0 {
+                    let x0 = ((x.floor() as i32) - 2).clamp(0, bw);
+                    let y0 = ((y.floor() as i32) - 2).clamp(0, bh);
+                    let x1 = (((x + w2).ceil() as i32) + 2).clamp(0, bw);
+                    let y1 = (((y + h2).ceil() as i32) + 2).clamp(0, bh);
+                    Some((x0, y0, x1 - x0, y1 - y0))
+                } else {
+                    None
+                };
+                let union = |a: Option<(i32, i32, i32, i32)>, b: Option<(i32, i32, i32, i32)>| match (a, b) {
+                    (Some(a), Some(b)) => {
+                        let (x0, y0) = (a.0.min(b.0), a.1.min(b.1));
+                        let (x1, y1) = ((a.0 + a.2).max(b.0 + b.2), (a.1 + a.3).max(b.1 + b.3));
+                        Some((x0, y0, x1 - x0, y1 - y0))
+                    }
+                    (a, None) => a,
+                    (None, b) => b,
+                };
+                let prev = if fresh { None } else { s.ink.filter(|r| r.2 > 0 && r.3 > 0) };
+                let full = fresh || s.ink.is_none();
+                let area = if full { Some((0, 0, bw, bh)) } else { union(prev, cur) };
+                if !full {
+                    // Clear what the previous frame drew (the rest of the buffer is already empty).
+                    if let Some((x, y, w3, h3)) = prev {
+                        let data = unsafe { std::slice::from_raw_parts_mut(canvas.as_mut_ptr(), (stride * bh) as usize) };
+                        for row in y..(y + h3) {
+                            let o = (row * stride + x * 4) as usize;
+                            data[o..o + (w3 * 4) as usize].fill(0);
+                        }
+                    }
+                }
+                if let Some((x, y, w3, h3)) = cur {
+                    let cr = cairo::Context::new(&img).expect("cairo context");
+                    cr.rectangle(x as f64, y as f64, w3 as f64, h3 as f64);
+                    cr.clip();
+                    let _ = cr.set_source_surface(&rec, 0.0, 0.0);
+                    let _ = cr.paint();
+                }
+                s.ink = cur.or(Some((0, 0, 0, 0)));
+                damage = area.unwrap_or((0, 0, 0, 0));
+            }
             img.flush();
         }
         s.hits = hits;
@@ -582,7 +643,9 @@ impl App {
             s.hover = hit_at(&s.hits, px, py).map(|h| h.id);
         }
         let wl = s.wl().clone();
-        wl.damage_buffer(0, 0, bw, bh);
+        if damage.2 > 0 && damage.3 > 0 {
+            wl.damage_buffer(damage.0, damage.1, damage.2, damage.3);
+        }
         if animating || s.closing {
             wl.frame(&qh, smithay_client_toolkit::compositor::FrameCallbackData(wl.clone()));
             s.frame_pending = true;
@@ -1126,7 +1189,13 @@ impl App {
                 self.mark(Kind::Osd);
             }
             Msg::Battery(b) => {
+                let changed = self.data.battery.as_ref().map(|x| x.percent.round() as i64) != b.as_ref().map(|x| x.percent.round() as i64)
+                    || self.data.battery.as_ref().map(|x| x.charging) != b.as_ref().map(|x| x.charging);
                 self.data.battery = b;
+                if changed {
+                    self.mark(Kind::Desktop);
+                    self.respec(Kind::Desktop);
+                }
                 self.mark(Kind::Bar);
                 self.mark(Kind::Control);
             }
@@ -1226,12 +1295,17 @@ impl App {
                 self.mark(Kind::Clipboard);
             }
             Msg::Sys(s) => {
+                if self.data.sys == crate::data::SysStat::default() {
+                    // First reading: show it now rather than at the next minute tick.
+                    self.mark(Kind::Desktop);
+                }
                 self.data.sys = s;
                 self.mark(Kind::Dashboard);
                 self.mark(Kind::Bar);
             }
             Msg::Weather(w) => {
                 self.data.weather = w;
+                self.mark(Kind::Desktop);
                 self.mark(Kind::Dashboard);
                 self.mark(Kind::Bar);
             }
@@ -1267,6 +1341,7 @@ impl App {
                     self.mark(Kind::Dashboard);
                     self.mark(Kind::Calendar);
                     self.mark(Kind::NotifCenter);
+                    self.mark(Kind::Desktop);
                 }
                 if self.theme.cfg.bar.clock_format.contains("%S") || self.theme.cfg.bar.clock_format.contains("%T") {
                     self.mark(Kind::Bar);
@@ -1641,7 +1716,7 @@ impl LayerShellHandler for App {
             let uid = self.surfs[i].uid;
             let kind = self.surfs[i].kind;
             self.destroy(uid);
-            if matches!(kind, Kind::Bar | Kind::Dock | Kind::Wallpaper) {
+            if matches!(kind, Kind::Bar | Kind::Dock | Kind::Wallpaper | Kind::Desktop) {
                 self.sync_persistent();
             }
         }
@@ -1651,7 +1726,8 @@ impl LayerShellHandler for App {
         let s = &mut self.surfs[i];
         let (w, h) = c.new_size;
         let (nw, nh) = (if w == 0 { s.spec.size.0 } else { w }, if h == 0 { s.spec.size.1 } else { h });
-        if (nw, nh) != (s.w, s.h) {
+        let resized = (nw, nh) != (s.w, s.h);
+        if resized {
             s.w = nw.max(1);
             s.h = nh.max(1);
             if s.kind == Kind::Wallpaper {
@@ -1659,9 +1735,15 @@ impl LayerShellHandler for App {
                 s.pool = None;
             }
         }
+        // Compositors re-send configure to every layer surface on an output whenever another one
+        // maps (each popup open). Only the first configure or a real resize needs a new frame:
+        // redrawing on every event re-decoded photo wallpapers on each popup.
+        let first = !s.configured;
         s.configured = true;
-        s.dirty = true;
-        if !s.frame_pending {
+        if first || resized {
+            s.dirty = true;
+        }
+        if s.dirty && !s.frame_pending {
             self.draw(i);
         }
     }
