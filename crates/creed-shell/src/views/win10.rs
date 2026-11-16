@@ -132,7 +132,23 @@ pub fn draw_module(ui: &mut Ui, name: &str, r: Rect, data: &Data) -> bool {
             };
             ui.icon(r, &icon, 16.0, Some(t.text1));
             let action = Action::Toggle(Kind::Control);
-            let hit = ui.hit(key, r, action, Role::Button, name.to_string());
+            // What a screen reader says (Windows reads e.g. "Network Wi-Fi connected, internet access").
+            let label = match name {
+                "network" => match data.net.kind {
+                    NetKind::Wifi => format!("Network: Wi-Fi {} ({}%)", data.net.name, data.net.signal),
+                    NetKind::Ethernet => "Network: wired, connected".to_string(),
+                    NetKind::None => "Network: not connected".to_string(),
+                },
+                "volume" => match &data.audio {
+                    Some(a) => format!("Volume {:.0}%{}", a.volume * 100.0, if a.muted { ", muted" } else { "" }),
+                    None => "Volume: no audio device".to_string(),
+                },
+                _ => match &data.battery {
+                    Some(b) => format!("Battery {:.0}%{}", b.percent, if b.charging { ", charging" } else { "" }),
+                    None => "Battery".to_string(),
+                },
+            };
+            let hit = ui.hit(key, r, action, Role::Button, label);
             if name == "volume" {
                 hit.scroll = Some(|d| Action::VolumeStep(d * 0.02));
             }

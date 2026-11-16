@@ -28,6 +28,13 @@ su tester -c tests/cli.sh || fail "cli"
 stage "Creed Settings: every page, edits persist, welcome flow"
 su tester -c tests/settings.sh || fail "settings app"
 
+stage "Screen reader: every control reaches AT-SPI with a name, in every mode"
+for d in modes/*/; do m=$(basename "$d"); su tester -c "tests/a11y.sh $m" | grep -E "✗" && fail "a11y $m"; done
+echo "  all modes ok"
+
+stage "SDDM login themes render with the real greeter"
+su tester -c tests/sddm.sh || fail "sddm"
+
 stage "Every shell dispatcher is accepted by Hyprland"
 su tester -c tests/dispatchers.sh || fail "dispatchers"
 
