@@ -208,6 +208,13 @@ pub fn uninstall(yes: bool) -> Result<(), String> {
     for rc in [".bashrc", ".zshrc", ".config/fish/config.fish"] {
         strip_rc(&p.home.join(rc));
     }
+    // The user.lua template is removed only if the user never edited it.
+    let user = p.home.join(".config/hypr/user.lua");
+    let template = fs::read_to_string(p.data.join("templates/hypr/user.lua")).unwrap_or_default();
+    if fs::read_to_string(&user).map(|t| t == template).unwrap_or(false) {
+        let _ = fs::remove_file(&user);
+    }
+    let _ = fs::remove_dir(p.home.join(".config/hypr/creed-tweaks"));
     let _ = fs::remove_dir_all(p.generated());
     let _ = fs::remove_file(p.config.join(".setup-done"));
     println!("✓ Creed removed for this user. Packages stay installed; remove them with pacman if you like.");

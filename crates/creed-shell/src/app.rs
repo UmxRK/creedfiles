@@ -696,6 +696,10 @@ impl App {
         for k in popups {
             self.close(k);
         }
+        if kind == Kind::Snap {
+            // Snap / window menu always acts on the window that is focused right now.
+            self.views.snap_target = self.data.active_addr.clone();
+        }
         self.views.on_open(kind, &mut self.data);
         if matches!(kind, Kind::Dashboard) {
             self.data.uptime = uptime();
@@ -761,8 +765,18 @@ impl App {
         use creed_core::hypr::lua_str;
         match action {
             Action::None => {}
-            Action::Toggle(k) => self.toggle(k),
-            Action::Open(k) => self.open(k),
+            Action::Toggle(k) => {
+                if k == Kind::Overview {
+                    self.views.overview_launchpad = false;
+                }
+                self.toggle(k)
+            }
+            Action::Open(k) => {
+                if k == Kind::Overview {
+                    self.views.overview_launchpad = false;
+                }
+                self.open(k)
+            }
             Action::Close(k) => self.close(k),
             Action::CloseAll => self.close_popups(),
             Action::Exec(cmd) => {
@@ -1270,9 +1284,6 @@ impl App {
             "ping" => "pong".into(),
             "toggle" | "open" | "close" => match Kind::parse(arg) {
                 Some(k) => {
-                    if k == Kind::Snap {
-                        self.views.snap_target = self.data.active_addr.clone();
-                    }
                     if k == Kind::Overview {
                         self.views.overview_launchpad = parts.next() == Some("apps") || arg == "launchpad";
                     }

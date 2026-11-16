@@ -1,0 +1,10 @@
+post_install() {
+  echo ">>> Creed is installed. As your normal user, run:  creed setup"
+  echo ">>> Then log in to Hyprland. Optional tweaks:      creed tweak recommended"
+}
+post_upgrade() {
+  echo ">>> Creed updated. Run 'creed theme apply' (or log out and back in) to refresh."
+}
+pre_remove() {
+  echo ">>> Before removing Creed you can restore your old configs with: creed uninstall"
+}

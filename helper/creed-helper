@@ -21,9 +21,9 @@ case "${1:-}" in
     # Refuse anything not owned by root or writable by others.
     for f in "$DATA" "$DATA/tweaks" "$dir" "$dir"/*; do
       [ "$(stat -c %u "$f")" = 0 ] || die "$f is not owned by root"
-      perms=$(stat -c %a "$f"); [[ "${perms: -1}" =~ [014] ]] || die "$f is writable by others"
+      perms=$(stat -c %a "$f"); [[ "${perms: -1}" =~ [0145] ]] || die "$f is writable by others"
     done
-    user_home=$(getent passwd "${PKEXEC_UID:-0}" | cut -d: -f6)
+    user_home=$(getent passwd "${PKEXEC_UID:-${SUDO_UID:-0}}" | cut -d: -f6)
     exec env -i PATH="$PATH" LANG=C.UTF-8 CREED_DATA="$DATA" CREED_USER_HOME="$user_home" \
       /usr/bin/creed tweak-root "$action" "$id" ${extra:+"$extra"}
     ;;

@@ -19,8 +19,17 @@ fn privileged(action: &str, id: &str, confirm: bool) -> Result<(), String> {
     if !std::path::Path::new(HELPER).exists() {
         return Err(format!("{HELPER} is missing - run the installer to set up system tweaks"));
     }
-    let mut c = Command::new("pkexec");
-    c.args([HELPER, "tweak", action, id]);
+    // The installer already holds sudo and sets CREED_PRIV=sudo; everywhere else polkit is used.
+    let mut c = if std::env::var("CREED_PRIV").as_deref() == Ok("sudo") {
+        let mut c = Command::new("sudo");
+        c.args(["-n", HELPER]);
+        c
+    } else {
+        let mut c = Command::new("pkexec");
+        c.arg(HELPER);
+        c
+    };
+    c.args(["tweak", action, id]);
     if confirm {
         c.arg("--confirm");
     }

@@ -91,12 +91,12 @@ preflight() {
 
 hardware_summary() {
   say "Your hardware"
-  local gpu
-  gpu=$( (for d in /sys/class/drm/card[0-9]; do v=$(cat "$d/device/vendor" 2>/dev/null); case "$v" in 0x10de) echo NVIDIA;; 0x1002) echo AMD;; 0x8086) echo Intel;; esac; done) | sort -u | paste -sd+ -)
+  local gpu=""
+  gpu=$( (for d in /sys/class/drm/card[0-9]*; do [ -e "$d/device/vendor" ] || continue; case "$(cat "$d/device/vendor")" in 0x10de) echo NVIDIA;; 0x1002) echo AMD;; 0x8086) echo Intel;; esac; done) 2>/dev/null | sort -u | paste -sd+ - || true)
   info "GPU:     ${gpu:-unknown}"
-  info "CPU:     $(grep -m1 'model name' /proc/cpuinfo | cut -d: -f2 | sed 's/^ //')"
+  info "CPU:     $(grep -m1 'model name' /proc/cpuinfo 2>/dev/null | cut -d: -f2 | sed 's/^ //' || true)"
   info "RAM:     $(awk '/MemTotal/ {printf "%.1f GB", $2/1048576}' /proc/meminfo)"
-  if ls /sys/class/power_supply/*/type 2>/dev/null | xargs -r cat | grep -q Battery; then info "Type:    laptop"; else info "Type:    desktop"; fi
+  if grep -qs Battery /sys/class/power_supply/*/type; then info "Type:    laptop"; else info "Type:    desktop"; fi
 }
 
 # ───────────── packages ─────────────
@@ -239,7 +239,7 @@ choose_tweaks() {
   confirm "Apply ${#selected[@]} tweak(s)?" || { warn "Tweaks skipped"; return 0; }
   for id in "${selected[@]}"; do
     if [ "$DRY" = 1 ]; then echo "  [dry-run] creed tweak apply $id --yes"; continue; fi
-    if creed tweak apply "$id" --yes >> "$LOG" 2>&1; then ok "$id"; else warn "$id failed (see $LOG)"; fi
+    if CREED_PRIV=sudo creed tweak apply "$id" --yes >> "$LOG" 2>&1; then ok "$id"; else warn "$id failed (see $LOG)"; fi
   done
 }
 

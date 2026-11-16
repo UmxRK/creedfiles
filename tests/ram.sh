@@ -23,11 +23,14 @@ sleep 4
 # Every always-on surface must be mapped while we measure.
 state=$($S cmd state)
 after=$(pss)
+pid=$(cat /tmp/creed-test/shell.pid)
+t0=$(awk '{print $14+$15}' /proc/$pid/stat); sleep 3; t1=$(awk '{print $14+$15}' /proc/$pid/stat)
+idle_ticks=$((t1 - t0))
 echo "mode=$mode res=$res scale=$scale cycles=$cycles"
 echo "surfaces: $state"
-echo "PSS start: $((before/1024)) MB   PSS after cycling: $((after/1024)) MB   limit: $limit MB"
-pid=$(cat /tmp/creed-test/shell.pid)
+echo "PSS start: $((before/1024)) MB   PSS after cycling: $((after/1024)) MB   limit: $limit MB   idle CPU: ${idle_ticks} ticks/3s"
 awk '/^[0-9a-f]+-[0-9a-f]+ /{name=$6} /^Pss:/{if ($2>400) printf "  %6d kB %s\n", $2, name}' /proc/$pid/smaps | sort -rn | head -8
 $S stop >/dev/null 2>&1
 for k in bar dock wallpaper; do echo "$state" | grep -q "\"$k\"" || { echo "FAIL: $k not mapped"; exit 1; }; done
+[ "$idle_ticks" -le 3 ] || { echo "FAIL: shell is busy while idle"; exit 1; }
 [ $((after/1024)) -le "$limit" ] && echo PASS || { echo FAIL; exit 1; }

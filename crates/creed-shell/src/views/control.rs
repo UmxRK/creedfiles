@@ -171,6 +171,10 @@ fn main_page(ui: &mut Ui, inner: Rect, data: &Data, variant: &str) {
 fn chevron(ui: &mut Ui, tile: Rect, key: ui::Id, label: &str, action: Action, on: bool) {
     let th = ui.th;
     let r = Rect::new(tile.right() - 34.0, tile.y + 8.0, 28.0, tile.h - 16.0);
+    // Split button: the tile's own click area stops where the arrow starts.
+    if let Some(h) = ui.hits.iter_mut().rev().find(|h| h.rect == tile) {
+        h.rect.w = (r.x - 4.0 - tile.x).max(0.0);
+    }
     let hv = ui.hover_amt(key);
     let col = if on { th.pal.on_accent } else { th.pal.text };
     gfx::fill_rounded(ui.cr, r, 8.0, col.with_alpha(0.08 + 0.1 * hv));
