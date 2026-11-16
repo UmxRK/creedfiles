@@ -1053,14 +1053,15 @@ impl App {
     }
 
     pub fn show_osd(&mut self) {
-        if !self.is_open(Kind::Osd) {
-            let out = self.focused_output();
-            self.create(Kind::Osd, out);
-        } else {
+        // Reuse an OSD that is open *or still fading out* - never stack a second one on top.
+        if self.surfs.iter().any(|s| s.kind == Kind::Osd) {
             for s in self.surfs.iter_mut().filter(|s| s.kind == Kind::Osd) {
                 s.closing = false;
                 s.dirty = true;
             }
+        } else {
+            let out = self.focused_output();
+            self.create(Kind::Osd, out);
         }
     }
 
@@ -1083,6 +1084,14 @@ impl App {
                 self.mark(Kind::Osd);
             }
             Msg::Mic(a) => {
+                // Mic-mute key feedback: show the OSD when the mute state flips (not on level drift).
+                let flipped = matches!((&self.data.mic, &a), (Some(o), Some(n)) if o.muted != n.muted);
+                if flipped && self.started.elapsed().as_secs() > 2 {
+                    if let Some(n) = &a {
+                        self.data.osd = Some((OsdKind::Mic, if n.muted { 0.0 } else { n.volume }, Instant::now()));
+                        self.show_osd();
+                    }
+                }
                 self.data.mic = a;
                 self.mark(Kind::Control);
             }
@@ -1389,13 +1398,33 @@ impl App {
                 if self.data.game { "on".into() } else { "off".into() }
             }
             "osd" => {
-                // Re-read state now and show the OSD for it.
-                match arg {
-                    "volume" => services::audio::refresh(&self.tx),
-                    "brightness" => services::power::refresh_brightness(&self.tx),
-                    _ => {}
+                // `osd <kind>` re-reads that state; `osd <kind> <value>` shows that OSD directly
+                // (used by tests and scripts).
+                let value = cmd.split_whitespace().nth(2).and_then(|v| v.parse::<f64>().ok());
+                let kind = match arg {
+                    "volume" => Some(OsdKind::Volume),
+                    "mic" => Some(OsdKind::Mic),
+                    "brightness" => Some(OsdKind::Brightness),
+                    "game" => Some(OsdKind::Game),
+                    _ => None,
+                };
+                match (kind, value) {
+                    (None, _) => "error: unknown osd kind".into(),
+                    (Some(k), Some(v)) => {
+                        self.data.osd = Some((k, v.clamp(0.0, 1.0), Instant::now()));
+                        self.show_osd();
+                        "ok".into()
+                    }
+                    (Some(OsdKind::Brightness), None) => {
+                        services::power::refresh_brightness(&self.tx);
+                        "ok".into()
+                    }
+                    (Some(OsdKind::Game), None) => "error: game osd needs a value".into(),
+                    (Some(_), None) => {
+                        services::audio::refresh(&self.tx);
+                        "ok".into()
+                    }
                 }
-                "ok".into()
             }
             "dump-layout" => {
                 let mut out = vec![];

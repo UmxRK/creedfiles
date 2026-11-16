@@ -3,7 +3,7 @@
 # Hyprland itself (`--verify-config`). Run as tester inside the Arch test root.
 set -uo pipefail
 fail=0
-for m in $(ls /src/modes); do
+for d in /src/modes/*/; do m=$(basename "$d")
   H=$(mktemp -d); export HOME=$H CREED_DATA=/src CREED_CONFIG=$H/.config/creed XDG_RUNTIME_DIR=/run/user/1000
   mkdir -p $CREED_CONFIG
   printf '[general]\nmode = "%s"\n' "$m" > $CREED_CONFIG/overrides.toml

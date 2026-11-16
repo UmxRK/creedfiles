@@ -1,7 +1,7 @@
 #!/bin/bash
 # Renders modes/<id>/preview.png (640×360) from a live headless session.
 S=/src/tests/session.sh
-for m in $(ls /src/modes); do
+for d in /src/modes/*/; do m=$(basename "$d")
   export CREED_CONFIG=/tmp/creed-test/cfg-prev-$m; rm -rf $CREED_CONFIG; mkdir -p $CREED_CONFIG
   printf '[general]\nmode = "%s"\n' "$m" > $CREED_CONFIG/overrides.toml
   $S stop >/dev/null 2>&1; $S start 1920x1080 >/dev/null; eval "$($S env)"

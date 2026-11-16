@@ -28,6 +28,15 @@ done
 $S cmd "open overview apps" >/dev/null; sleep 1.2; shot 20-launchpad; $S cmd "close overview" >/dev/null; sleep 0.8
 $S cmd "open launcher" >/dev/null; sleep 0.8; $S cmd "type fi" >/dev/null; sleep 0.8; shot 21-launcher-search; $S cmd "close launcher" >/dev/null; sleep 0.8
 $S cmd "open launcher" >/dev/null; sleep 0.8; $S cmd "type 12*(3+4)" >/dev/null; sleep 0.8; shot 22-launcher-calc; $S cmd "close launcher" >/dev/null; sleep 0.8
+# On-screen displays: volume, muted mic, brightness, game mode.
+for o in "volume 0.6" "mic 0" "brightness 0.4" "game 1"; do
+  $S cmd "osd $o" >/dev/null; sleep 0.9; shot "30-osd-${o%% *}"; $S cmd dump-layout > "$OUT/30-osd-${o%% *}.json"; sleep 2.2
+done
+# macOS app menus (Edit is the richest one).
+if [[ $mode == mac-* ]]; then
+  r=$($S cmd "click bar Edit menu"); [ "$r" = ok ] || { echo "✗ $mode: Edit menu not clickable ($r)"; exit 1; }
+  sleep 0.8; shot 40-menu-edit; $S cmd dump-layout > "$OUT/40-menu-edit.json"; $S cmd "close menu" >/dev/null; sleep 0.6
+fi
 $S cmd dump-layout > "$OUT/00-desktop.json"
 pid=$(cat /tmp/creed-test/shell.pid)
 grep -E "^(Pss|Rss):" /proc/$pid/smaps_rollup > "$OUT/memory.txt"

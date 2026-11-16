@@ -3,7 +3,7 @@
 # fonts and icon themes (see tests/README in the repo history) with this tree at /src and a
 # user "tester" (uid 1000). Exits non-zero on the first failing stage.
 set -uo pipefail
-cd /src
+cd /src || exit 1
 stage() { printf '\n\033[1m▶ %s\033[0m\n' "$*"; }
 fail() { printf '\033[31m✗ %s\033[0m\n' "$*"; exit 1; }
 
@@ -39,7 +39,7 @@ for m in creed mac-tahoe win11; do
 done
 
 stage "Screenshots of every surface in every mode → tests/out/"
-for m in $(ls modes); do su tester -c "tests/visual.sh $m" >/dev/null || fail "visual $m"; done
+for d in modes/*/; do m=$(basename "$d"); su tester -c "tests/visual.sh $m" >/dev/null || fail "visual $m"; done
 python3 tests/check-layout.py tests/out || fail "layout geometry"
 
 printf '\n\033[32m✓ All checks passed\033[0m\n'

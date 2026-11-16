@@ -27,7 +27,7 @@ SHELL
   toggle|open|close <surface>   launcher, control, dashboard, notif-center, overview,
                                 launchpad, clipboard, emoji, power, snap, calendar
   reload                        Reload the shell's configuration
-  osd volume|brightness         Show the on-screen display
+  osd volume|mic|brightness     Show the on-screen display (optional level 0–1)
   game on|off|toggle|status     Game Mode
   snap left|right               Snap the active window to a half of the screen
   screenshot region|screen      Screenshot to clipboard + ~/Pictures/Screenshots
@@ -184,7 +184,12 @@ fn run(args: &[String]) -> Result<(), String> {
             shell_ipc(&cmd).map(|_| ())
         }
         "reload" => shell_ipc("reload").map(|_| ()),
-        "osd" => shell_ipc(&format!("osd {}", a(1))).map(|_| ()),
+        "osd" => match a(1) {
+            "volume" | "mic" | "brightness" | "game" => {
+                shell_ipc(format!("osd {} {}", a(1), a(2)).trim()).map(|_| ())
+            }
+            _ => Err("usage: creed osd volume|mic|brightness [0-1]".into()),
+        },
         "game" => {
             let r = shell_ipc(&format!("game {}", if a(1).is_empty() { "status" } else { a(1) }))?;
             println!("Game Mode: {r}");

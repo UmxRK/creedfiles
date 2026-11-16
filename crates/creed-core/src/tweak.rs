@@ -207,7 +207,7 @@ impl Engine {
         let stdout = String::from_utf8_lossy(&out.stdout).to_string();
         if !out.status.success() {
             let err = String::from_utf8_lossy(&out.stderr);
-            return Err(format!("{} {script} failed: {}{}", t.id, err.trim(), if stdout.is_empty() { "" } else { "" }));
+            return Err(format!("{} {script} failed: {}", t.id, err.trim()));
         }
         Ok(stdout)
     }

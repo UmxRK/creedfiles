@@ -615,10 +615,17 @@ pub fn osd(ui: &mut Ui, kind: crate::data::OsdKind, value: f64) {
     let icon = match kind {
         crate::data::OsdKind::Brightness => "display-brightness-symbolic",
         crate::data::OsdKind::Game => "input-gaming-symbolic",
+        crate::data::OsdKind::Mic if value <= 0.0 => "microphone-disabled-symbolic",
+        crate::data::OsdKind::Mic => "audio-input-microphone-symbolic",
         _ if value <= 0.0 => "audio-volume-muted-symbolic",
         _ => "audio-volume-high-symbolic",
     };
     ui.icon(Rect::new(r.x + 16.0, r.y, 20.0, r.h), icon, 16.0, Some(t.text1));
+    if kind == crate::data::OsdKind::Game {
+        let label = if value > 0.5 { "Game Mode on" } else { "Game Mode off" };
+        ui.text(Rect::new(r.x + 48.0, r.y, r.w - 64.0, r.h), label, &Text::new(BODY, t.text1));
+        return;
+    }
     let v = ui.spring(ui::id("w11.osd"), value.clamp(0.0, 1.0), value.clamp(0.0, 1.0));
     let track = Rect::new(r.x + 48.0, r.cy() - 2.0, r.w - 48.0 - 48.0, 4.0);
     gfx::fill_rounded(ui.cr, track, 2.0, if t.dark { Color::rgba(1.0, 1.0, 1.0, 0.55) } else { Color::rgba(0.0, 0.0, 0.0, 0.45) });

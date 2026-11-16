@@ -1,4 +1,4 @@
 . "$CREED_TWEAK_DIR/../../lib.sh"
 d="$HOME/.local/share/Steam/steamapps/shadercache"
 [ -d "$d" ] || exit 0
-echo "  $(human $(du_b "$d"))  ~/.local/share/Steam/steamapps/shadercache"
+echo "  $(human "$(du_b "$d")")  ~/.local/share/Steam/steamapps/shadercache"

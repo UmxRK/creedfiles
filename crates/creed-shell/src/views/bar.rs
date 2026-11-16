@@ -66,8 +66,6 @@ fn status_icons(data: &Data) -> (String, String, Option<String>, Option<String>)
     let bt = data.bt.as_ref().map(|b| {
         if !b.powered {
             "bluetooth-disabled-symbolic"
-        } else if b.connected.is_empty() {
-            "bluetooth-active-symbolic"
         } else {
             "bluetooth-active-symbolic"
         }

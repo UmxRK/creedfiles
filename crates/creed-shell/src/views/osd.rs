@@ -65,7 +65,7 @@ pub fn draw(ui: &mut Ui, closing: bool, data: &Data) {
     let (icon, rest) = inner.take_left(24.0, 14.0);
     let (name, pct) = match kind {
         OsdKind::Volume => (if value <= 0.0 { "audio-volume-muted-symbolic" } else { "audio-volume-high-symbolic" }, Some(value)),
-        OsdKind::Mic => ("audio-input-microphone-symbolic", Some(value)),
+        OsdKind::Mic => (if value <= 0.0 { "microphone-disabled-symbolic" } else { "audio-input-microphone-symbolic" }, Some(value)),
         OsdKind::Brightness => ("display-brightness-symbolic", Some(value)),
         OsdKind::Game => ("input-gaming-symbolic", None),
     };

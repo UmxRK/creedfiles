@@ -131,7 +131,7 @@ pub fn draw_module(ui: &mut Ui, name: &str, r: Rect, data: &Data) -> bool {
                 _ => data.battery.as_ref().map(|b| super::bar::battery_icon(b.percent, b.charging)).unwrap_or_default(),
             };
             ui.icon(r, &icon, 16.0, Some(t.text1));
-            let action = if name == "volume" { Action::Toggle(Kind::Control) } else { Action::Toggle(Kind::Control) };
+            let action = Action::Toggle(Kind::Control);
             let hit = ui.hit(key, r, action, Role::Button, name.to_string());
             if name == "volume" {
                 hit.scroll = Some(|d| Action::VolumeStep(d * 0.02));
@@ -461,6 +461,11 @@ pub fn osd(ui: &mut Ui, kind: crate::data::OsdKind, value: f64) {
     let (w, h) = ui.size;
     let r = Rect::new(0.0, 0.0, w, h);
     gfx::fill_rounded(ui.cr, r, 0.0, surface(&t));
+    if kind == crate::data::OsdKind::Game {
+        ui.icon(Rect::new(r.x, r.y + 30.0, r.w, 40.0), "input-gaming-symbolic", 24.0, Some(t.text1));
+        ui.text(Rect::new(r.x, r.y + 80.0, r.w, 20.0), if value > 0.5 { "On" } else { "Off" }, &Text::new(BODY, t.text1).center());
+        return;
+    }
     let v = ui.spring(ui::id("w10.osd"), value.clamp(0.0, 1.0), value.clamp(0.0, 1.0));
     ui.text(Rect::new(r.x, r.y + 8.0, r.w, 20.0), &format!("{:.0}", v * 100.0), &Text::new(BODY, t.text1).center());
     let track = Rect::new(r.cx() - 3.0, r.y + 36.0, 6.0, r.h - 80.0);
@@ -471,6 +476,8 @@ pub fn osd(ui: &mut Ui, kind: crate::data::OsdKind, value: f64) {
     let icon = match kind {
         crate::data::OsdKind::Brightness => "display-brightness-symbolic",
         crate::data::OsdKind::Game => "input-gaming-symbolic",
+        crate::data::OsdKind::Mic if value <= 0.0 => "microphone-disabled-symbolic",
+        crate::data::OsdKind::Mic => "audio-input-microphone-symbolic",
         _ if value <= 0.0 => "audio-volume-muted-symbolic",
         _ => "audio-volume-high-symbolic",
     };

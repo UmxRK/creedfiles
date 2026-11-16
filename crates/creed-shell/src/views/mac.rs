@@ -144,6 +144,25 @@ fn glyph_search(cr: &cairo::Context, c: (f64, f64), s: f64, col: Color) {
     let _ = cr.stroke();
 }
 
+fn glyph_mic(cr: &cairo::Context, c: (f64, f64), s: f64, col: Color, muted: bool) {
+    gfx::set(cr, col);
+    // Capsule head, cradle arc, stem and base - the SF "mic" silhouette, drawn from scratch.
+    gfx::fill_rounded(cr, Rect::new(c.0 - s * 0.16, c.1 - s * 0.46, s * 0.32, s * 0.56), s * 0.16, col);
+    cr.set_line_width(s * 0.08);
+    cr.set_line_cap(cairo::LineCap::Round);
+    cr.new_path();
+    cr.arc(c.0, c.1 - s * 0.06, s * 0.3, 0.0, std::f64::consts::PI);
+    cr.move_to(c.0, c.1 + s * 0.24);
+    cr.line_to(c.0, c.1 + s * 0.42);
+    cr.move_to(c.0 - s * 0.16, c.1 + s * 0.42);
+    cr.line_to(c.0 + s * 0.16, c.1 + s * 0.42);
+    if muted {
+        cr.move_to(c.0 - s * 0.4, c.1 - s * 0.46);
+        cr.line_to(c.0 + s * 0.4, c.1 + s * 0.42);
+    }
+    let _ = cr.stroke();
+}
+
 fn glyph_speaker(cr: &cairo::Context, c: (f64, f64), s: f64, col: Color, level: f64, muted: bool) {
     gfx::set(cr, col);
     cr.new_path();
@@ -733,13 +752,21 @@ pub fn osd(ui: &mut Ui, kind: crate::data::OsdKind, value: f64) {
     let title = match kind {
         crate::data::OsdKind::Brightness => "Display",
         crate::data::OsdKind::Game => "Game Mode",
+        crate::data::OsdKind::Mic => "Microphone",
         _ => "Sound",
     };
     ui.text(Rect::new(r.x + 14.0, r.y + 6.0, r.w - 28.0, 18.0), title, &Text::new(13.0, mm.label).bold());
-    let v = ui.spring(ui::id("mac.osd"), value.clamp(0.0, 1.0), value.clamp(0.0, 1.0));
     let sr = Rect::new(r.x + 14.0, r.y + 26.0, r.w - 28.0, 26.0);
+    if kind == crate::data::OsdKind::Game {
+        ui.icon(Rect::new(sr.x, sr.y, 22.0, sr.h), "input-gaming-symbolic", 16.0, Some(mm.label));
+        let label = if value > 0.5 { "On - effects paused" } else { "Off" };
+        ui.text(Rect::new(sr.x + 30.0, sr.y, sr.w - 30.0, sr.h), label, &Text::new(13.0, mm.label));
+        return;
+    }
+    let v = ui.spring(ui::id("mac.osd"), value.clamp(0.0, 1.0), value.clamp(0.0, 1.0));
     match kind {
         crate::data::OsdKind::Brightness => big_slider(ui, &mm, sr, v, &|cr, c, col| glyph_sun(cr, c, 14.0, col)),
+        crate::data::OsdKind::Mic => big_slider(ui, &mm, sr, v, &|cr, c, col| glyph_mic(cr, c, 14.0, col, value <= 0.0)),
         _ => big_slider(ui, &mm, sr, v, &|cr, c, col| glyph_speaker(cr, c, 13.0, col, 1.0, false)),
     }
 }

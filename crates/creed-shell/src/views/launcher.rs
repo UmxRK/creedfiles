@@ -2,11 +2,10 @@
 //! `start10` (Windows 10 Start with tiles), `spotlight` (macOS), `aqua`.
 //! Extras: inline calculator (`2+2*3`, `=sqrt` free), `>` runs a shell command.
 
-use super::{Views, open_amount, popup_anchor, popup_transform};
+use super::{Views, open_amount, popup_transform};
 use crate::data::{AppEntry, Data};
-use crate::gfx::{self, Align, Rect, Text};
+use crate::gfx::Rect;
 use crate::ui::{self, Action, Kind, Role, Ui};
-use creed_core::Color;
 
 /// Ranks apps against a query. Empty query → all apps alphabetically.
 pub fn search(apps: &[AppEntry], q: &str) -> Vec<usize> {
@@ -234,126 +233,6 @@ fn draw_card(ui: &mut Ui, t: f64, data: &Data, views: &mut Views, variant: &str)
         }
     });
     super::clip_hits(ui, from, list_r);
-}
-
-fn app_tile(ui: &mut Ui, r: Rect, a: &AppEntry, selected: bool, key: ui::Id, icon_size: f64) {
-    let th = ui.th;
-    let hv = ui.hover_amt(key);
-    if selected {
-        gfx::fill_rounded(ui.cr, r, th.radius_small(), th.pal.accent.with_alpha(0.18));
-    }
-    th.hover_bg(ui.cr, r, th.radius_small(), hv);
-    let (ic, rest) = r.inset_xy(4.0, 8.0).take_top(icon_size, 6.0);
-    ui.icon(ic, &a.icon, icon_size, None);
-    ui.text(rest, &a.name, &Text::new(th.fs * 0.88, th.pal.text).center());
-    if ui.focus == Some(key) {
-        th.focus_ring(ui.cr, r, th.radius_small());
-    }
-    ui.hit(key, r, Action::Launch(a.id.clone()), Role::Button, a.name.clone());
-}
-
-fn pinned_apps<'a>(ui: &Ui, data: &'a Data) -> Vec<&'a AppEntry> {
-    let mut out: Vec<&AppEntry> = ui.th.cfg.dock.pinned.iter().filter_map(|p| data.apps.iter().find(|a| &a.id == p)).collect();
-    // Fill up with other apps for a full grid.
-    for a in &data.apps {
-        if out.len() >= 18 {
-            break;
-        }
-        if !out.iter().any(|x| x.id == a.id) {
-            out.push(a);
-        }
-    }
-    out
-}
-
-fn draw_start11(ui: &mut Ui, t: f64, data: &Data, views: &mut Views) {
-    let th = ui.th;
-    let (w, h) = (640.0, 700.0f64.min(ui.size.1 - 120.0));
-    let panel = popup_anchor(ui, w, h, Align::Center);
-    popup_transform(ui, panel, t, false);
-    th.panel(ui.cr, panel, th.radius(), "launcher", ui.pointer);
-    ui.record("launcher.panel", panel, None);
-    ui.hit(ui::id("launcher.panel"), panel, Action::None, Role::Group, "");
-    let inner = panel.inset_xy(32.0, 28.0);
-    let (input_r, rest) = inner.take_top(36.0, 24.0);
-    let pre = views.preedit.clone();
-    ui.input(ui::id("launcher.input"), input_r, &views.query, "Search for apps, settings, and documents", true, &pre);
-    let (footer, body) = rest.take_bottom(56.0, 12.0);
-    if views.query.is_empty() {
-        let (hd, grid) = body.take_top(28.0, 8.0);
-        super::heading(ui, hd, "Pinned");
-        let apps = pinned_apps(ui, data);
-        let cols = 6;
-        let cell_w = grid.w / cols as f64;
-        let cell_h = 92.0;
-        for (i, a) in apps.iter().enumerate().take(18) {
-            let r = Rect::new(grid.x + (i % cols) as f64 * cell_w, grid.y + (i / cols) as f64 * cell_h, cell_w, cell_h - 4.0);
-            app_tile(ui, r.inset(2.0), a, views.sel == i && false, ui::idn("start.pin", &a.id), 34.0);
-        }
-    } else {
-        draw_results_list(ui, body, data, views);
-    }
-    // Footer: user + power.
-    let line = if th.dark { Color::rgba(1.0, 1.0, 1.0, 0.06) } else { Color::rgba(0.0, 0.0, 0.0, 0.06) };
-    gfx::fill_rounded(ui.cr, Rect::new(panel.x, footer.y - 6.0, panel.w, 1.0), 0.0, line);
-    let (user_r, power_r) = footer.take_right(40.0, 8.0);
-    let (av, name_r) = power_r.take_left(32.0, 10.0);
-    let av = Rect::centered(av.cx(), user_r.cy(), 32.0, 32.0);
-    gfx::fill_rounded(ui.cr, av, 16.0, th.pal.accent_alt);
-    let initial: String = data.user.chars().next().map(|c| c.to_uppercase().collect()).unwrap_or_else(|| "U".into());
-    ui.text(av, &initial, &Text::new(th.fs, th.pal.on_accent).bold().center());
-    ui.text(name_r, &data.user, &Text::new(th.fs, th.pal.text));
-    ui.icon_button(ui::id("start.power"), Rect::centered(user_r.cx(), user_r.cy(), 36.0, 36.0), "system-shutdown-symbolic", "Power", Action::Open(Kind::Power), false);
-}
-
-fn draw_start10(ui: &mut Ui, t: f64, data: &Data, views: &mut Views) {
-    let th = ui.th;
-    let (w, h) = (720.0, 640.0f64.min(ui.size.1 - 80.0));
-    let panel = popup_anchor(ui, w, h, Align::Start);
-    let panel = Rect::new(0.0, panel.y + 8.0, w, h);
-    popup_transform(ui, panel, t, false);
-    th.panel(ui.cr, panel, 0.0, "launcher", ui.pointer);
-    ui.record("launcher.panel", panel, None);
-    ui.hit(ui::id("launcher.panel"), panel, Action::None, Role::Group, "");
-    // Left rail.
-    let (rail, rest) = panel.take_left(48.0, 0.0);
-    let rail_items: [(&str, &str, Action); 4] = [
-        ("avatar-default-symbolic", "Account", Action::None),
-        ("folder-documents-symbolic", "Documents", Action::Exec(format!("{} ~/Documents", th.cfg.general.file_manager))),
-        ("emblem-system-symbolic", "Settings", Action::Exec("creed-settings".into())),
-        ("system-shutdown-symbolic", "Power", Action::Open(Kind::Power)),
-    ];
-    for (i, (ic, label, act)) in rail_items.into_iter().enumerate() {
-        let y = if i == 0 { rail.y + 8.0 } else { rail.bottom() - 48.0 * (4 - i) as f64 - 8.0 };
-        ui.icon_button(ui::idn("start10.rail", i), Rect::new(rail.x, y, 48.0, 48.0), ic, label, act, false);
-    }
-    let (list_col, tiles) = rest.take_left(260.0, 8.0);
-    let (input_r, list_r) = list_col.inset_xy(8.0, 10.0).take_top(34.0, 10.0);
-    let pre = views.preedit.clone();
-    ui.input(ui::id("launcher.input"), input_r, &views.query, "Type here to search", true, &pre);
-    draw_results_list(ui, list_r, data, views);
-    // Tiles (pinned) with accent backgrounds.
-    let tiles = tiles.inset(12.0);
-    let (hd, grid) = tiles.take_top(24.0, 8.0);
-    super::heading(ui, hd, "Life at a glance");
-    let apps = pinned_apps(ui, data);
-    let cols = 3;
-    let cell = ((grid.w - 8.0 * (cols as f64 - 1.0)) / cols as f64).floor();
-    for (i, a) in apps.iter().enumerate().take(12) {
-        let r = Rect::new(grid.x + (i % cols) as f64 * (cell + 8.0), grid.y + (i / cols) as f64 * (cell * 0.9 + 8.0), cell, cell * 0.9);
-        if r.bottom() > grid.bottom() {
-            break;
-        }
-        let k = ui::idn("start10.tile", &a.id);
-        let hv = ui.hover_amt(k);
-        gfx::fill_rounded(ui.cr, r, 0.0, th.pal.accent.with_alpha(0.75 + 0.15 * hv));
-        if hv > 0.0 {
-            gfx::stroke_rounded(ui.cr, r, 0.0, 2.0, Color::rgba(1.0, 1.0, 1.0, 0.4 * hv));
-        }
-        ui.icon(Rect::new(r.x, r.y, r.w, r.h - 22.0), &a.icon, (r.h * 0.38).round(), None);
-        ui.text(Rect::new(r.x + 8.0, r.bottom() - 24.0, r.w - 16.0, 20.0), &a.name, &Text::new(th.fs * 0.85, th.pal.on_accent));
-        ui.hit(k, r, Action::Launch(a.id.clone()), Role::Button, a.name.clone());
-    }
 }
 
 pub fn draw_results_list_pub(ui: &mut Ui, area: Rect, data: &Data, views: &mut Views) {

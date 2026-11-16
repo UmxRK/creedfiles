@@ -377,12 +377,6 @@ pub fn draw(ui: &mut Ui, kind: Kind, closing: bool, data: &Data, views: &mut Vie
     }
 }
 
-/// Section heading used in panels.
-pub fn heading(ui: &mut Ui, r: Rect, s: &str) {
-    let t = Text::new(ui.th.fs * 0.82, ui.th.pal.muted).bold();
-    ui.text(r, &s.to_uppercase(), &t);
-}
-
 /// Empty-state message centred in `r`.
 pub fn empty(ui: &mut Ui, r: Rect, icon: &str, msg: &str) {
     let (ic, rest) = Rect::new(r.x, r.cy() - 40.0, r.w, 80.0).take_top(40.0, 6.0);

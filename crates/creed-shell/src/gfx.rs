@@ -190,7 +190,7 @@ impl Theme {
         let glass_on = self.cfg.glass.enabled;
         let (tint, frost, specular) = self.cfg.glass_for(element);
         let material = if glass_on { st.material } else { Material::Solid };
-        let base = if self.dark { p.surface } else { p.surface };
+        let base = p.surface;
         match material {
             Material::Solid => fill_rounded(cr, r, radius, base),
             Material::Frost | Material::Mica | Material::Acrylic => {
