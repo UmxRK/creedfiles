@@ -75,11 +75,11 @@ Creed settings in `~/.config/creed` are kept in case you come back.
 |---|---|
 | `creed` | Material You (in the style of end-4's illogical-impulse): colours from your wallpaper via Material 3, a flush bar with resources, media, workspaces and status, rounded screen corners, full-height sidebars for quick settings, notifications, the calendar, a to-do list and widgets |
 | `win11` | Centred taskbar, Mica, rounded windows, Start with pinned apps, Snap Layouts, Widgets, Task View |
-| `win10` | Left taskbar with search box, Acrylic, square corners, tiled Start, full-height Action Center |
+| `win10` | Left taskbar with search box and ENG/US indicator, Acrylic, square corners, Start with theme-aware tiles (Productivity / Explore), full-height Action Center, bottom-left lock clock |
 | `mac-tahoe` | Liquid Glass: transparent menu bar, glass dock, Spotlight that grows into one glass panel, Spotlight clipboard, desktop widgets, Tahoe lock screen |
-| `mac-sequoia` | Frosted vibrancy menu bar, Control Center, Mission Control, magnifying dock |
-| `mac-bigsur` | Bright Big Sur style: light appearance and a soft translucent menu bar |
-| `mac-aqua` | Pinstripes, glossy menu bar and the reflective shelf dock |
+| `mac-sequoia` | Frosted vibrancy menu bar, Control Center, top-right Sound HUD, Mission Control, magnifying dock, sunrise-sheets wallpaper |
+| `mac-bigsur` | Bright Big Sur style: light appearance, soft translucent menu bar, the square volume HUD |
+| `mac-aqua` | Tiger-era Aqua: pinstripes, glossy menu bar, blue Spotlight tile and drop-down, AirPort/volume menu extras, Dashboard over a dimmed screen, Growl bubbles, smoked volume HUD, reflective dock |
 
 Switch modes in **Creed Settings → Modes**, with **Super+Ctrl+M**, or with:
 
@@ -280,8 +280,8 @@ tests/ram.sh 2560x1440 1 20 60 mac-tahoe
 
 | Setup | Limit | Measured |
 |---|---|---|
-| 1 monitor up to 1440p, any mode | 60 MB | 24–32 MB |
-| 4K or multi-monitor | 120 MB | 37–42 MB |
+| 1 monitor at 1080p, any mode | 60 MB | 27–33 MB |
+| 4K or multi-monitor | 120 MB | 40–45 MB |
 
 Run `creed ram` to check your own machine.
 
