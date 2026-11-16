@@ -20,7 +20,13 @@ fn card_height(th: &gfx::Theme, n: &Notif) -> f64 {
 }
 
 pub fn spec(th: &gfx::Theme, data: &Data, _ow: u32, _oh: u32) -> Spec {
-    let h: f64 = data.notifs.iter().map(|n| card_height(th, n) + GAP).sum::<f64>() + 16.0;
+    let variant = th.cfg.style.notifications.as_str();
+    let (cw, h) = match variant {
+        "win11" => (364.0 + 24.0, data.notifs.iter().map(|n| super::win11::toast_height(n) + 12.0).sum::<f64>() + 12.0),
+        "win10" => (364.0 + 24.0, data.notifs.iter().map(|n| super::win10::toast_height(n) + 12.0).sum::<f64>() + 12.0),
+        "mac" => (344.0 + 24.0, data.notifs.iter().map(|n| super::mac::banner_height(n) + 10.0).sum::<f64>() + 12.0),
+        _ => (W + 24.0, data.notifs.iter().map(|n| card_height(th, n) + GAP).sum::<f64>() + 16.0),
+    };
     let corner = th.cfg.notifications.position;
     let anchor = match corner {
         Corner::TopRight => Anchor::TOP | Anchor::RIGHT,
@@ -32,7 +38,7 @@ pub fn spec(th: &gfx::Theme, data: &Data, _ow: u32, _oh: u32) -> Spec {
     Spec {
         layer: Layer::Overlay,
         anchor,
-        size: ((W + 24.0) as u32, h.max(1.0) as u32),
+        size: (cw as u32, h.max(1.0) as u32),
         margin: (0, 0, 0, 0),
         exclusive: 0,
         keyboard: KeyboardInteractivity::None,
@@ -116,7 +122,7 @@ pub fn strip_markup(s: &str) -> String {
     out.replace("&lt;", "<").replace("&gt;", ">").replace("&quot;", "\"").replace("&apos;", "'").replace("&amp;", "&")
 }
 
-fn ago(t: i64) -> String {
+pub fn ago(t: i64) -> String {
     let d = (time::now_secs() - t).max(0);
     if d < 60 {
         "now".into()
@@ -130,6 +136,12 @@ fn ago(t: i64) -> String {
 }
 
 pub fn draw_popups(ui: &mut Ui, data: &Data) {
+    match ui.th.cfg.style.notifications.as_str() {
+        "win11" => return super::win11::toasts(ui, data),
+        "win10" => return super::win10::toasts(ui, data),
+        "mac" => return super::mac::banners(ui, data),
+        _ => {}
+    }
     let th = ui.th;
     let (sw, _) = ui.size;
     let top = matches!(th.cfg.notifications.position, Corner::TopLeft | Corner::TopRight | Corner::TopCenter);
@@ -158,6 +170,20 @@ pub fn draw_popups(ui: &mut Ui, data: &Data) {
 pub fn draw_center(ui: &mut Ui, closing: bool, data: &Data, views: &mut Views) {
     let t = open_amount(ui, closing);
     ui.backdrop(Action::Close(Kind::NotifCenter));
+    let v = ui.th.cfg.style.notifications.clone();
+    if matches!(v.as_str(), "win11" | "win10" | "mac") {
+        ui.cr.save().ok();
+        ui.cr.push_group();
+        match v.as_str() {
+            "win11" => super::win11::notif_center(ui, t, data, views),
+            "win10" => super::win10::action_center(ui, t, data, views),
+            _ => super::mac::notif_center(ui, t, data, views),
+        }
+        let _ = ui.cr.pop_group_to_source();
+        let _ = ui.cr.paint_with_alpha(t.clamp(0.0, 1.0));
+        ui.cr.restore().ok();
+        return;
+    }
     let th = ui.th;
     let variant = th.cfg.style.notifications.clone();
     let (sw, sh) = ui.size;

@@ -11,6 +11,19 @@ pub fn draw(ui: &mut Ui, closing: bool, data: &Data, views: &mut Views) {
     ui.backdrop(Action::Close(Kind::Control));
     let th = ui.th;
     let variant = th.cfg.style.control.clone();
+    if matches!(variant.as_str(), "win11" | "win10" | "mac" | "aqua") {
+        ui.cr.save().ok();
+        ui.cr.push_group();
+        match variant.as_str() {
+            "win11" => super::win11::quick_settings(ui, t, data, views),
+            "win10" => super::win10::action_center(ui, t, data, views),
+            _ => super::mac::control_center(ui, t, data, views),
+        }
+        let _ = ui.cr.pop_group_to_source();
+        let _ = ui.cr.paint_with_alpha(t.clamp(0.0, 1.0));
+        ui.cr.restore().ok();
+        return;
+    }
     let w = match variant.as_str() {
         "win10" => 380.0,
         "mac" | "aqua" => 340.0,
@@ -207,6 +220,10 @@ fn page_header(ui: &mut Ui, r: Rect, title: &str) -> Rect {
     ui.icon_button(ui::id("cc.back"), back, "go-previous-symbolic", "Back", Action::Page(0), false);
     ui.text(title_r, title, &Text::new(ui.th.fs * 1.15, ui.th.pal.text).bold());
     rest
+}
+
+pub fn wifi_page_pub(ui: &mut Ui, r: Rect, data: &Data, views: &mut Views) {
+    wifi_page(ui, r, data, views)
 }
 
 fn wifi_page(ui: &mut Ui, r: Rect, data: &Data, views: &mut Views) {

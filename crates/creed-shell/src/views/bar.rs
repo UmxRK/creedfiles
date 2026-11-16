@@ -83,6 +83,24 @@ pub fn battery_icon(pct: f64, charging: bool) -> String {
 
 /// Main-axis length a module wants.
 fn module_len(ui: &mut Ui, name: &str, data: &Data, h: f64) -> f64 {
+    match ui.th.cfg.style.bar.as_str() {
+        "win11" => {
+            if let Some(l) = super::win11::module_len(ui, name, data) {
+                return l;
+            }
+        }
+        "win10" => {
+            if let Some(l) = super::win10::module_len(ui, name, data) {
+                return l;
+            }
+        }
+        "mac" | "aqua" => {
+            if let Some(l) = super::mac::module_len(ui, name, data) {
+                return l;
+            }
+        }
+        _ => {}
+    }
     let th = ui.th;
     let fs = th.fs;
     let variant = th.cfg.style.bar.as_str();
@@ -273,8 +291,9 @@ pub fn draw(ui: &mut Ui, data: &Data, _views: &mut super::Views, cfg_err: Option
     ui.record("bar", full, None);
     let h = b.size as f64;
     let radius = if floating { b.radius.min(h / 2.0) } else { 0.0 };
-    let pad = (h * 0.16).round();
-    let gap = 2.0;
+    let os_variant = matches!(th.cfg.style.bar.as_str(), "win11" | "win10" | "mac" | "aqua");
+    let pad = if os_variant { if th.cfg.style.bar.starts_with("win") { 4.0 } else { 10.0 } } else { (h * 0.16).round() };
+    let gap = if os_variant { 0.0 } else { 2.0 };
 
     // Measure sections.
     let sections: [(&str, Vec<String>); 3] = [("left", b.left.clone()), ("center", b.center.clone()), ("right", b.right.clone())];
@@ -312,6 +331,15 @@ pub fn draw(ui: &mut Ui, data: &Data, _views: &mut super::Views, cfg_err: Option
     };
 
     // Background.
+    match th.cfg.style.bar.as_str() {
+        "win11" => super::win11::bar_background(ui, full),
+        "win10" => super::win10::bar_background(ui, full),
+        "mac" | "aqua" => super::mac::bar_background(ui, full),
+        _ => draw_creed_background(ui, full, radius, floating, &sect_rect, &lens),
+    }
+    fn draw_creed_background(ui: &mut Ui, full: Rect, radius: f64, floating: bool, sect_rect: &dyn Fn(usize) -> Rect, lens: &[f64]) {
+    let th = ui.th;
+    let b = &th.cfg.bar;
     match b.style {
         BarStyle::Islands => {
             for i in 0..3 {
@@ -345,6 +373,8 @@ pub fn draw(ui: &mut Ui, data: &Data, _views: &mut super::Views, cfg_err: Option
         }
     }
 
+    }
+
     for (si, (sname, mods)) in measured.iter().enumerate() {
         let sr = sect_rect(si);
         if lens[si] > 0.0 {
@@ -376,6 +406,15 @@ fn shell_q(s: &str) -> String {
 }
 
 fn draw_module(ui: &mut Ui, name: &str, r: Rect, data: &Data) {
+    let handled = match ui.th.cfg.style.bar.as_str() {
+        "win11" => super::win11::draw_module(ui, name, r, data),
+        "win10" => super::win10::draw_module(ui, name, r, data),
+        "mac" | "aqua" => super::mac::draw_module(ui, name, r, data),
+        _ => false,
+    };
+    if handled {
+        return;
+    }
     let th = ui.th;
     let p = &th.pal;
     let fs = th.fs;

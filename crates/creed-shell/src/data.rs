@@ -156,6 +156,8 @@ pub struct Data {
     pub menu: Vec<MenuEntry>,
     pub menu_owner: String,
     pub apps: Vec<AppEntry>,
+    /// Recently used files (path, display name, when) from recently-used.xbel.
+    pub recent: Vec<(String, String, String)>,
     pub clips: Vec<(String, String)>,
     pub sys: SysStat,
     pub weather: Option<WeatherNow>,

@@ -1,0 +1,12 @@
+[Icon Theme]
+Name=Creed Fluent
+Comment=Microsoft Fluent System Icons (MIT) under freedesktop names, for Creed's Windows modes
+Inherits=Fluent-dark,Fluent,Papirus-Dark,Adwaita,hicolor
+Directories=symbolic
+
+[symbolic]
+Size=24
+MinSize=8
+MaxSize=512
+Type=Scalable
+Context=Status

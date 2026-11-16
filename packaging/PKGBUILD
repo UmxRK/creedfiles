@@ -1,0 +1,72 @@
+# Maintainer: Creed contributors
+pkgname=creed-dotfiles
+pkgver=0.1.0
+pkgrel=1
+pkgdesc="Creed: a light, mode-switching Hyprland desktop (Creed, Windows 10/11, macOS looks)"
+arch=('x86_64' 'aarch64')
+url="https://github.com/UmxRK/creedfiles"
+license=('GPL-3.0-or-later')
+depends=('hyprland>=0.57' 'hyprlock' 'hypridle' 'xdg-desktop-portal-hyprland' 'xdg-desktop-portal-gtk'
+         'qt5-wayland' 'qt6-wayland' 'qt6ct' 'polkit' 'wireplumber' 'pipewire-pulse' 'libpulse'
+         'networkmanager' 'bluez-utils' 'brightnessctl' 'playerctl' 'power-profiles-daemon'
+         'grim' 'slurp' 'wl-clipboard' 'cliphist' 'libnotify' 'curl'
+         'cairo' 'pango' 'python' 'python-gobject' 'gtk4' 'libadwaita'
+         'inter-font' 'ttf-jetbrains-mono' 'noto-fonts' 'noto-fonts-emoji' 'papirus-icon-theme' 'adwaita-icon-theme' 'adw-gtk-theme'
+         'foot' 'starship' 'pacman-contrib' 'zram-generator')
+optdepends=('hyprpolkitagent: password dialogs for apps'
+            'hyprsunset: Night Light'
+            'gamemode: Game Mode CPU governor'
+            'mangohud: performance overlay styled per mode'
+            'gamescope: game compositor'
+            'kitty: alternative terminal (themed)'
+            'thunar: default file manager'
+            'sddm: Creed login screens'
+            'btop: Task Manager shortcut in Windows modes')
+makedepends=('cargo' 'git')
+install=creed.install
+source=("$pkgname::git+$url.git")
+sha256sums=('SKIP')
+
+pkgver() {
+  cd "$pkgname"
+  printf "0.1.0.r%s.%s" "$(git rev-list --count HEAD)" "$(git rev-parse --short HEAD)"
+}
+
+prepare() {
+  cd "$pkgname"
+  export RUSTUP_TOOLCHAIN=stable
+  cargo fetch --locked --target "$(rustc -vV | sed -n 's/host: //p')"
+}
+
+build() {
+  cd "$pkgname"
+  export RUSTUP_TOOLCHAIN=stable CARGO_TARGET_DIR=target
+  cargo build --frozen --release
+}
+
+check() {
+  cd "$pkgname"
+  cargo test --frozen --release --workspace
+}
+
+package() {
+  cd "$pkgname"
+  install -Dm755 target/release/creed "$pkgdir/usr/bin/creed"
+  install -Dm755 target/release/creed-shell "$pkgdir/usr/bin/creed-shell"
+  install -Dm755 settings/creed-settings "$pkgdir/usr/bin/creed-settings"
+  install -Dm755 helper/creed-helper "$pkgdir/usr/lib/creed/creed-helper"
+  install -Dm644 packaging/polkit/50-creed.rules "$pkgdir/usr/share/polkit-1/rules.d/50-creed.rules"
+  install -Dm644 packaging/creed-settings.desktop "$pkgdir/usr/share/applications/creed-settings.desktop"
+  install -Dm644 packaging/creed.svg "$pkgdir/usr/share/icons/hicolor/scalable/apps/creed-settings.svg"
+  install -d "$pkgdir/usr/share/creed" "$pkgdir/usr/share/icons"
+  cp -r modes templates tweaks defaults.toml "$pkgdir/usr/share/creed/"
+  cp -r icons/Creed-Fluent "$pkgdir/usr/share/icons/"
+  chmod -R u=rwX,go=rX "$pkgdir/usr/share/creed" "$pkgdir/usr/share/icons/Creed-Fluent"
+  for t in sddm/*/; do
+    install -d "$pkgdir/usr/share/sddm/themes/$(basename "$t")"
+    cp -r "$t". "$pkgdir/usr/share/sddm/themes/$(basename "$t")/"
+  done
+  install -Dm644 LICENSE "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+  install -Dm644 icons/Creed-Fluent/LICENSE "$pkgdir/usr/share/licenses/$pkgname/FLUENT-ICONS-LICENSE"
+  install -Dm644 README.md "$pkgdir/usr/share/doc/$pkgname/README.md"
+}

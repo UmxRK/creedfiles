@@ -22,7 +22,7 @@ left = ["launcher", "search", "taskview", "taskbar"]
 center = []
 right = ["tray", "network", "volume", "battery", "keyboard", "clock", "notifications"]
 clock_format = "%H:%M"
-date_format = "%d/%m/%Y"
+date_format = "%x"
 
 [dock]
 enabled = false
@@ -49,7 +49,7 @@ shadow = 0.3
 material = "acrylic"
 window_mode = "float"
 titlebar = "windows"
-icon_theme = "Fluent-dark"
+icon_theme = "Creed-Fluent"
 cursor_theme = "Adwaita"
 gtk_theme = "adw-gtk3-dark"
 palette = "windows10"
@@ -65,3 +65,4 @@ window_gaps_in = 3
 window_gaps_out = 6
 window_rounding = 0
 window_border = 1
+font = "Segoe UI Variable Text, Segoe UI, Selawik, Inter"

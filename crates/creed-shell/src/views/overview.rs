@@ -28,7 +28,7 @@ pub fn draw(ui: &mut Ui, closing: bool, data: &Data, views: &mut Views) {
         launchpad(ui, data, views);
     } else {
         match ui.th.cfg.style.overview.as_str() {
-            "taskview" => cards(ui, data, views, false),
+            "taskview" => super::win11::task_view(ui, data, views),
             "mission" => cards(ui, data, views, true),
             _ => workspace_map(ui, data, views),
         }
@@ -74,6 +74,10 @@ fn window_card(ui: &mut Ui, r: Rect, c: &Client, data: &Data, selected: bool, id
 }
 
 /// Grid layout that keeps cards at roughly 16:10 and centres the last row.
+pub fn grid_pub(area: Rect, n: usize, aspect: f64, gap: f64) -> Vec<Rect> {
+    grid(area, n, aspect, gap)
+}
+
 fn grid(area: Rect, n: usize, aspect: f64, gap: f64) -> Vec<Rect> {
     if n == 0 {
         return vec![];

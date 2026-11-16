@@ -1,0 +1,739 @@
+//! macOS surfaces (Big Sur → Tahoe, plus Aqua): menu bar, Control Center, Spotlight,
+//! Notification Center + banners and the volume HUD, laid out like the real system.
+//! Colours are Apple's label/system colours; type is SF Pro metrics (13 pt menus/body,
+//! 11 pt secondary). Status glyphs are drawn as vectors (SF Symbols cannot be shipped).
+
+use super::Views;
+use crate::data::{Data, NetKind};
+use crate::gfx::{self, Rect, Text};
+use crate::time;
+use crate::ui::{self, Action, Kind, Role, Slider, Ui};
+use creed_core::config::Material;
+use creed_core::Color;
+use std::f64::consts::PI;
+
+struct M {
+    dark: bool,
+    label: Color,
+    label2: Color,
+    label3: Color,
+    sel: Color,
+    module: Color,
+    panel: Color,
+    stroke: Color,
+    accent: Color,
+    tahoe: bool,
+    aqua: bool,
+}
+
+fn m(ui: &Ui) -> M {
+    let th = ui.th;
+    let d = th.dark;
+    let tahoe = th.cfg.style.material == Material::Glass;
+    let aqua = th.cfg.style.material == Material::Aqua;
+    let frost = th.cfg.glass.frost;
+    M {
+        dark: d,
+        label: if d { Color::rgba(1.0, 1.0, 1.0, 0.85) } else { Color::rgba(0.0, 0.0, 0.0, 0.85) },
+        label2: if d { Color::rgba(1.0, 1.0, 1.0, 0.55) } else { Color::rgba(0.0, 0.0, 0.0, 0.5) },
+        label3: if d { Color::rgba(1.0, 1.0, 1.0, 0.25) } else { Color::rgba(0.0, 0.0, 0.0, 0.25) },
+        sel: if d { Color::rgba(1.0, 1.0, 1.0, 0.2) } else { Color::rgba(0.0, 0.0, 0.0, 0.1) },
+        module: if d { Color::rgba(1.0, 1.0, 1.0, if tahoe { 0.1 } else { 0.08 }) } else { Color::rgba(1.0, 1.0, 1.0, if tahoe { 0.35 } else { 0.55 }) },
+        panel: if d { Color::rgba(0.16, 0.16, 0.16, if tahoe { frost.max(0.25) } else { 0.78 }) } else { Color::rgba(0.93, 0.93, 0.93, if tahoe { frost.max(0.3) } else { 0.78 }) },
+        stroke: if d { Color::rgba(1.0, 1.0, 1.0, 0.16) } else { Color::rgba(0.0, 0.0, 0.0, 0.12) },
+        accent: th.pal.accent,
+        tahoe,
+        aqua,
+    }
+}
+
+fn panel_radius(m: &M, base: f64) -> f64 {
+    if m.tahoe {
+        base + 10.0
+    } else if m.aqua {
+        6.0
+    } else {
+        base
+    }
+}
+
+/// Window-style panel (Control Center, Spotlight, notifications).
+fn panel(ui: &mut Ui, mm: &M, r: Rect, radius: f64, element: &str) {
+    if mm.tahoe {
+        ui.th.panel(ui.cr, r, radius, element, ui.pointer);
+        return;
+    }
+    gfx::shadow(ui.cr, r, radius, 22.0, 10.0, if mm.dark { 0.5 } else { 0.22 });
+    gfx::fill_rounded(ui.cr, r, radius, mm.panel);
+    gfx::stroke_rounded(ui.cr, r, radius, 1.0, mm.stroke);
+    if mm.dark {
+        // Hairline outer edge in dark mode, like AppKit's vibrant windows.
+        gfx::stroke_rounded(ui.cr, Rect::new(r.x - 1.0, r.y - 1.0, r.w + 2.0, r.h + 2.0), radius + 1.0, 1.0, Color::rgba(0.0, 0.0, 0.0, 0.5));
+    }
+}
+
+// ───────────────────────────── vector glyphs ─────────────────────────────
+
+fn glyph_wifi(cr: &cairo::Context, c: (f64, f64), s: f64, col: Color, level: u8) {
+    // Three arcs + dot, fanned upwards from the bottom point.
+    let (cx, cy) = (c.0, c.1 + s * 0.38);
+    cr.set_line_cap(cairo::LineCap::Round);
+    for i in 0..3u8 {
+        let rad = s * (0.28 + i as f64 * 0.24);
+        let a = if 3 - i <= level.max(1) { col } else { col.with_alpha(col.a * 0.3) };
+        gfx::set(cr, a);
+        cr.set_line_width(s * 0.12);
+        cr.new_path();
+        cr.arc(cx, cy, rad, -PI * 0.75, -PI * 0.25);
+        let _ = cr.stroke();
+    }
+    gfx::set(cr, col);
+    cr.new_path();
+    cr.arc(cx, cy - s * 0.02, s * 0.08, 0.0, 2.0 * PI);
+    let _ = cr.fill();
+}
+
+fn glyph_battery(cr: &cairo::Context, r: Rect, col: Color, pct: f64, charging: bool) {
+    // 25×12 body + 1.5×4 nub, 1 px outline, rounded 3.5.
+    let body = Rect::new(r.x, r.cy() - 6.0, 24.0, 12.0);
+    gfx::stroke_rounded(cr, body, 3.5, 1.0, col.with_alpha(col.a * 0.45));
+    gfx::fill_rounded(cr, Rect::new(body.right() + 1.0, body.cy() - 2.0, 1.5, 4.0), 0.75, col.with_alpha(col.a * 0.45));
+    let fill_w = (body.w - 4.0) * (pct / 100.0).clamp(0.04, 1.0);
+    let fc = if pct <= 20.0 && !charging { Color::rgba(1.0, 0.27, 0.23, 1.0) } else { col };
+    gfx::fill_rounded(cr, Rect::new(body.x + 2.0, body.y + 2.0, fill_w, body.h - 4.0), 1.8, fc);
+    if charging {
+        cr.new_path();
+        cr.move_to(body.cx() + 1.0, body.y + 1.5);
+        cr.line_to(body.cx() - 3.0, body.cy() + 0.5);
+        cr.line_to(body.cx(), body.cy() + 0.5);
+        cr.line_to(body.cx() - 1.0, body.bottom() - 1.5);
+        cr.line_to(body.cx() + 3.0, body.cy() - 0.5);
+        cr.line_to(body.cx(), body.cy() - 0.5);
+        cr.close_path();
+        gfx::set(cr, Color::WHITE);
+        let _ = cr.fill_preserve();
+        gfx::set(cr, Color::rgba(0.0, 0.0, 0.0, 0.6));
+        cr.set_line_width(0.5);
+        let _ = cr.stroke();
+    }
+}
+
+fn glyph_control_center(cr: &cairo::Context, c: (f64, f64), col: Color) {
+    // Two stacked toggles: knob left on top, knob right on bottom.
+    for (i, left) in [(0.0, true), (1.0, false)] {
+        let y = c.1 - 4.0 + i * 8.0;
+        let pill = Rect::new(c.0 - 8.0, y - 3.0, 16.0, 6.0);
+        gfx::stroke_rounded(cr, pill, 3.0, 1.2, col);
+        let kx = if left { pill.x + 3.0 } else { pill.right() - 3.0 };
+        cr.new_path();
+        cr.arc(kx, y, 2.2, 0.0, 2.0 * PI);
+        gfx::set(cr, col);
+        let _ = cr.fill();
+    }
+}
+
+fn glyph_search(cr: &cairo::Context, c: (f64, f64), s: f64, col: Color) {
+    gfx::set(cr, col);
+    cr.set_line_width(s * 0.11);
+    cr.set_line_cap(cairo::LineCap::Round);
+    cr.new_path();
+    cr.arc(c.0 - s * 0.08, c.1 - s * 0.08, s * 0.3, 0.0, 2.0 * PI);
+    let _ = cr.stroke();
+    cr.move_to(c.0 + s * 0.14, c.1 + s * 0.14);
+    cr.line_to(c.0 + s * 0.38, c.1 + s * 0.38);
+    let _ = cr.stroke();
+}
+
+fn glyph_speaker(cr: &cairo::Context, c: (f64, f64), s: f64, col: Color, level: f64, muted: bool) {
+    gfx::set(cr, col);
+    cr.new_path();
+    cr.move_to(c.0 - s * 0.42, c.1 - s * 0.14);
+    cr.line_to(c.0 - s * 0.24, c.1 - s * 0.14);
+    cr.line_to(c.0 - s * 0.02, c.1 - s * 0.36);
+    cr.line_to(c.0 - s * 0.02, c.1 + s * 0.36);
+    cr.line_to(c.0 - s * 0.24, c.1 + s * 0.14);
+    cr.line_to(c.0 - s * 0.42, c.1 + s * 0.14);
+    cr.close_path();
+    let _ = cr.fill();
+    cr.set_line_width(s * 0.08);
+    cr.set_line_cap(cairo::LineCap::Round);
+    if muted {
+        cr.move_to(c.0 + s * 0.12, c.1 - s * 0.14);
+        cr.line_to(c.0 + s * 0.4, c.1 + s * 0.14);
+        cr.move_to(c.0 + s * 0.4, c.1 - s * 0.14);
+        cr.line_to(c.0 + s * 0.12, c.1 + s * 0.14);
+        let _ = cr.stroke();
+        return;
+    }
+    for (i, th) in [0.34, 0.67, 1.0].iter().enumerate() {
+        let rad = s * (0.14 + i as f64 * 0.13);
+        let a = if level >= *th - 0.33 { col } else { col.with_alpha(col.a * 0.3) };
+        gfx::set(cr, a);
+        cr.new_path();
+        cr.arc(c.0 + s * 0.02, c.1, rad, -PI / 4.0, PI / 4.0);
+        let _ = cr.stroke();
+    }
+}
+
+fn glyph_sun(cr: &cairo::Context, c: (f64, f64), s: f64, col: Color) {
+    gfx::set(cr, col);
+    cr.new_path();
+    cr.arc(c.0, c.1, s * 0.2, 0.0, 2.0 * PI);
+    let _ = cr.fill();
+    cr.set_line_width(s * 0.08);
+    cr.set_line_cap(cairo::LineCap::Round);
+    for i in 0..8 {
+        let a = i as f64 * PI / 4.0;
+        cr.move_to(c.0 + a.cos() * s * 0.32, c.1 + a.sin() * s * 0.32);
+        cr.line_to(c.0 + a.cos() * s * 0.44, c.1 + a.sin() * s * 0.44);
+    }
+    let _ = cr.stroke();
+}
+
+fn glyph_logo(cr: &cairo::Context, c: (f64, f64), col: Color) {
+    // Neutral stand-in for the vendor menu: a soft four-dot knot (not any company's mark).
+    for (dx, dy) in [(0.0, -3.4), (3.4, 0.0), (0.0, 3.4), (-3.4, 0.0)] {
+        cr.new_path();
+        cr.arc(c.0 + dx, c.1 + dy, 2.6, 0.0, 2.0 * PI);
+        gfx::set(cr, col);
+        let _ = cr.fill();
+    }
+}
+
+// ───────────────────────────── menu bar ─────────────────────────────
+
+pub fn bar_background(ui: &mut Ui, full: Rect) {
+    let mm = m(ui);
+    let cr = ui.cr;
+    if mm.aqua {
+        let g = cairo::LinearGradient::new(0.0, full.y, 0.0, full.bottom());
+        g.add_color_stop_rgba(0.0, 1.0, 1.0, 1.0, 0.98);
+        g.add_color_stop_rgba(0.5, 0.95, 0.95, 0.95, 0.98);
+        g.add_color_stop_rgba(0.51, 0.91, 0.91, 0.91, 0.98);
+        g.add_color_stop_rgba(1.0, 0.86, 0.86, 0.86, 0.98);
+        cr.rectangle(full.x, full.y, full.w, full.h);
+        let _ = cr.set_source(&g);
+        let _ = cr.fill();
+        gfx::fill_rounded(cr, Rect::new(full.x, full.bottom() - 1.0, full.w, 1.0), 0.0, Color::rgba(0.0, 0.0, 0.0, 0.35));
+        return;
+    }
+    if mm.tahoe {
+        // Tahoe's menu bar is transparent; a very soft top scrim keeps labels legible.
+        let g = cairo::LinearGradient::new(0.0, full.y, 0.0, full.bottom());
+        g.add_color_stop_rgba(0.0, 0.0, 0.0, 0.0, if mm.dark { 0.18 } else { 0.06 });
+        g.add_color_stop_rgba(1.0, 0.0, 0.0, 0.0, 0.0);
+        cr.rectangle(full.x, full.y, full.w, full.h);
+        let _ = cr.set_source(&g);
+        let _ = cr.fill();
+        return;
+    }
+    let c = if mm.dark { Color::rgba(0.11, 0.11, 0.12, 0.62) } else { Color::rgba(0.97, 0.97, 0.97, 0.72) };
+    gfx::fill_rounded(cr, full, 0.0, c);
+}
+
+fn item_hover(ui: &mut Ui, mm: &M, r: Rect, key: ui::Id) {
+    let hv = ui.hover_amt(key);
+    let open = ui.is_pressed(key);
+    if hv > 0.01 || open {
+        let a = if open { 1.0 } else { hv };
+        let rr = Rect::centered(r.cx(), r.cy(), r.w, (r.h - 4.0).max(16.0));
+        gfx::fill_rounded(ui.cr, rr, if mm.aqua { 0.0 } else { 4.0 }, mm.sel.with_alpha(mm.sel.a * a));
+    }
+}
+
+fn bar_text(ui: &Ui, mm: &M) -> Color {
+    if mm.aqua {
+        Color::BLACK
+    } else if mm.tahoe {
+        if ui.th.dark {
+            Color::WHITE
+        } else {
+            Color::rgba(0.0, 0.0, 0.0, 0.88)
+        }
+    } else {
+        mm.label
+    }
+}
+
+pub fn module_len(ui: &mut Ui, name: &str, data: &Data) -> Option<f64> {
+    let mm = m(ui);
+    let fs = 13.0;
+    let col = bar_text(ui, &mm);
+    Some(match name {
+        "launcher" => 34.0,
+        "appmenu" => {
+            let app = data.active_client().map(|c| Data::pretty_class(&c.class)).unwrap_or_else(|| "Finder".into());
+            ui.measure(&app, &Text::new(fs, col).bold()).0 + 20.0 + ui.measure("Window", &Text::new(fs, col)).0 + 20.0
+        }
+        "window" => 0.0,
+        "battery" => {
+            if data.battery.is_some() {
+                ui.measure("100%", &Text::new(fs, col)).0 + 44.0
+            } else {
+                0.0
+            }
+        }
+        "network" | "control" | "search" | "volume" | "bluetooth" => {
+            if name == "bluetooth" && data.bt.is_none() {
+                0.0
+            } else {
+                34.0
+            }
+        }
+        "media" => match &data.media {
+            Some(m2) if !m2.title.is_empty() => 30.0,
+            _ => 0.0,
+        },
+        "tray" => data.tray.len() as f64 * 30.0,
+        "clock" => {
+            let s = format!("{}  {}", time::format(time::now_secs(), &ui.th.cfg.bar.date_format), super::bar::clock_text(ui));
+            ui.measure(&s, &Text::new(fs, col)).0 + 20.0
+        }
+        _ => return None,
+    })
+}
+
+pub fn draw_module(ui: &mut Ui, name: &str, r: Rect, data: &Data) -> bool {
+    let mm = m(ui);
+    let col = bar_text(ui, &mm);
+    let key = ui::id(&format!("mac.{name}"));
+    let fs = 13.0;
+    match name {
+        "launcher" => {
+            item_hover(ui, &mm, r, key);
+            glyph_logo(ui.cr, (r.cx(), r.cy()), col);
+            ui.hit(key, r, Action::Toggle(Kind::Power), Role::Button, "System menu");
+        }
+        "appmenu" => {
+            let app = data.active_client().map(|c| Data::pretty_class(&c.class)).unwrap_or_else(|| "Finder".into());
+            let aw = ui.measure(&app, &Text::new(fs, col).bold()).0 + 20.0;
+            let ar = Rect::new(r.x, r.y, aw, r.h);
+            item_hover(ui, &mm, ar, key);
+            ui.text(ar, &app, &Text::new(fs, col).bold().center());
+            ui.hit(key, ar, Action::Toggle(Kind::Snap), Role::Button, format!("{app} menu"));
+            let wk = ui::id("mac.windowmenu");
+            let wr = Rect::new(ar.right(), r.y, r.w - aw, r.h);
+            item_hover(ui, &mm, wr, wk);
+            ui.text(wr, "Window", &Text::new(fs, col).center());
+            ui.hit(wk, wr, Action::Toggle(Kind::Snap), Role::Button, "Window menu");
+        }
+        "battery" => {
+            let Some(b) = &data.battery else { return true };
+            item_hover(ui, &mm, r, key);
+            let pt = format!("{:.0}%", b.percent);
+            let tw = ui.measure(&pt, &Text::new(fs, col)).0;
+            ui.text(Rect::new(r.x + 8.0, r.y, tw, r.h), &pt, &Text::new(fs, col));
+            glyph_battery(ui.cr, Rect::new(r.x + 14.0 + tw, r.y, 27.0, r.h), col, b.percent, b.charging);
+            ui.hit(key, r, Action::Toggle(Kind::Control), Role::Button, format!("Battery {pt}"));
+        }
+        "network" => {
+            item_hover(ui, &mm, r, key);
+            let level = match data.net.kind {
+                NetKind::Wifi => (data.net.signal / 34 + 1).min(3),
+                NetKind::Ethernet => 3,
+                NetKind::None => 0,
+            };
+            if data.net.kind == NetKind::Ethernet {
+                ui.icon(r, "network-wired-symbolic", 15.0, Some(col));
+            } else {
+                glyph_wifi(ui.cr, (r.cx(), r.cy() - 1.0), 15.0, if level == 0 { col.with_alpha(col.a * 0.35) } else { col }, level);
+            }
+            ui.hit(key, r, Action::Toggle(Kind::Control), Role::Button, "Wi-Fi");
+        }
+        "volume" => {
+            item_hover(ui, &mm, r, key);
+            let (v, mu) = data.audio.as_ref().map(|a| (a.volume, a.muted)).unwrap_or((0.0, true));
+            glyph_speaker(ui.cr, (r.cx(), r.cy()), 16.0, col, v, mu || v <= 0.0);
+            let hit = ui.hit(key, r, Action::Toggle(Kind::Control), Role::Button, "Sound");
+            hit.scroll = Some(|d| Action::VolumeStep(d * 0.0625));
+        }
+        "bluetooth" => {
+            item_hover(ui, &mm, r, key);
+            ui.icon(r, "bluetooth-active-symbolic", 15.0, Some(col));
+            ui.hit(key, r, Action::Toggle(Kind::Control), Role::Button, "Bluetooth");
+        }
+        "control" => {
+            item_hover(ui, &mm, r, key);
+            glyph_control_center(ui.cr, (r.cx(), r.cy()), col);
+            ui.hit(key, r, Action::Toggle(Kind::Control), Role::Button, "Control Center");
+        }
+        "search" => {
+            item_hover(ui, &mm, r, key);
+            glyph_search(ui.cr, (r.cx(), r.cy()), 15.0, col);
+            ui.hit(key, r, Action::Toggle(Kind::Launcher), Role::Button, "Spotlight");
+        }
+        "media" => {
+            let Some(md) = &data.media else { return true };
+            item_hover(ui, &mm, r, key);
+            ui.icon(r, if md.playing { "media-playback-pause-symbolic" } else { "media-playback-start-symbolic" }, 14.0, Some(col));
+            ui.hit(key, r, Action::MediaPlayPause, Role::Button, format!("Now Playing: {}", md.title));
+        }
+        "tray" => {
+            for (i, item) in data.tray.iter().enumerate() {
+                let c = Rect::new(r.x + i as f64 * 30.0, r.y, 30.0, r.h);
+                let k = ui::idn("mac.tray", &item.key);
+                item_hover(ui, &mm, c, k);
+                if let Some((pw, ph, px)) = &item.pixmap {
+                    super::bar::draw_pixmap(ui.cr, Rect::centered(c.cx(), c.cy(), 16.0, 16.0), *pw, *ph, px);
+                } else {
+                    ui.icon(c, if item.icon.is_empty() { &item.id } else { &item.icon }, 16.0, Some(col));
+                }
+                let primary = Action::TrayMenu(item.key.clone());
+                ui.hit(k, c, primary, Role::Button, item.title.clone());
+            }
+        }
+        "clock" => {
+            item_hover(ui, &mm, r, key);
+            let s = format!("{}  {}", time::format(time::now_secs(), &ui.th.cfg.bar.date_format), super::bar::clock_text(ui));
+            ui.text(r, &s, &Text::new(fs, col).center());
+            ui.hit(key, r, Action::Toggle(Kind::NotifCenter), Role::Button, format!("Clock {s}"));
+        }
+        _ => return false,
+    }
+    true
+}
+
+// ───────────────────────────── Control Center ─────────────────────────────
+
+fn below_bar(ui: &Ui, w: f64) -> Rect {
+    let (sw, _) = ui.size;
+    let bar = if ui.th.cfg.bar.enabled { (ui.th.cfg.bar.size + ui.th.cfg.bar.margin) as f64 } else { 0.0 };
+    Rect::new(sw - w - 8.0, bar + 6.0, w, 0.0)
+}
+
+fn circle_toggle(ui: &mut Ui, mm: &M, c: (f64, f64), on: bool, icon: &str) {
+    let r = Rect::centered(c.0, c.1, 26.0, 26.0);
+    gfx::fill_rounded(ui.cr, r, 13.0, if on { mm.accent } else if mm.dark { Color::rgba(1.0, 1.0, 1.0, 0.15) } else { Color::rgba(0.0, 0.0, 0.0, 0.1) });
+    ui.icon(r, icon, 14.0, Some(if on { Color::WHITE } else { mm.label }));
+}
+
+fn module(ui: &mut Ui, mm: &M, r: Rect) {
+    gfx::fill_rounded(ui.cr, r, panel_radius(mm, 12.0), mm.module);
+}
+
+/// macOS slider: 22 px track, white fill, white knob; glyph inside the track's left end.
+fn big_slider(ui: &mut Ui, mm: &M, r: Rect, v: f64, glyph: &dyn Fn(&cairo::Context, (f64, f64), Color)) {
+    let track = Rect::new(r.x, r.cy() - 11.0, r.w, 22.0);
+    gfx::fill_rounded(ui.cr, track, 11.0, if mm.dark { Color::rgba(1.0, 1.0, 1.0, 0.15) } else { Color::rgba(0.0, 0.0, 0.0, 0.1) });
+    let fw = 22.0 + (track.w - 22.0) * v.clamp(0.0, 1.0);
+    gfx::fill_rounded(ui.cr, Rect::new(track.x, track.y, fw, 22.0), 11.0, Color::rgba(1.0, 1.0, 1.0, 0.95));
+    let knob = Rect::new(track.x + fw - 22.0, track.y, 22.0, 22.0);
+    gfx::shadow(ui.cr, knob, 11.0, 4.0, 1.0, 0.35);
+    gfx::fill_rounded(ui.cr, knob, 11.0, Color::WHITE);
+    glyph(ui.cr, (track.x + 11.0, track.cy()), Color::rgba(0.0, 0.0, 0.0, 0.6));
+}
+
+pub fn control_center(ui: &mut Ui, t_open: f64, data: &Data, _views: &mut Views) {
+    let mm = m(ui);
+    let pad = 10.0;
+    let w = 320.0;
+    let col_w = (w - pad * 3.0) / 2.0;
+    let has_media = data.media.is_some();
+    let h = pad + 136.0 + pad + 68.0 + pad + 68.0 + if has_media { pad + 68.0 } else { 0.0 } + pad;
+    let mut panel = below_bar(ui, w);
+    panel.h = h;
+    super::popup_transform(ui, panel, t_open, true);
+    panel_draw(ui, &mm, panel, 16.0, "control");
+    ui.record("control.panel", panel, None);
+    ui.hit(ui::id("control.panel"), panel, Action::None, Role::Group, "");
+    // Left: connectivity module (Wi-Fi, Bluetooth, Game Mode in place of AirDrop).
+    let left = Rect::new(panel.x + pad, panel.y + pad, col_w, 136.0);
+    module(ui, &mm, left);
+    let wifi_sub = match data.net.kind {
+        NetKind::Wifi => data.net.name.clone(),
+        NetKind::Ethernet => "Ethernet".into(),
+        NetKind::None if !data.net.available => "Unavailable".into(),
+        NetKind::None => if data.net.wifi_enabled { "Not Connected".into() } else { "Off".into() },
+    };
+    let rows: [(&str, &str, String, bool, Action); 3] = [
+        ("network-wireless-symbolic", "Wi-Fi", wifi_sub, data.net.wifi_enabled, Action::ToggleWifi),
+        ("bluetooth-active-symbolic", "Bluetooth", match &data.bt { Some(b) if b.powered => "On".into(), Some(_) => "Off".into(), None => "Unavailable".into() }, data.bt.as_ref().map(|b| b.powered).unwrap_or(false), Action::ToggleBluetooth),
+        ("input-gaming-symbolic", "Game Mode", if data.game { "On".into() } else { "Off".into() }, data.game, Action::ToggleGame),
+    ];
+    for (i, (icon, title, sub, on, action)) in rows.into_iter().enumerate() {
+        let rr = Rect::new(left.x + 10.0, left.y + 8.0 + i as f64 * 40.0, left.w - 20.0, 40.0);
+        let k = ui::idn("mac.cc.row", i);
+        circle_toggle(ui, &mm, (rr.x + 13.0, rr.cy()), on, icon);
+        ui.text(Rect::new(rr.x + 34.0, rr.y + 3.0, rr.w - 34.0, 18.0), title, &Text::new(13.0, mm.label).bold());
+        ui.text(Rect::new(rr.x + 34.0, rr.y + 20.0, rr.w - 34.0, 16.0), &sub, &Text::new(11.0, mm.label2));
+        let hit = ui.hit(k, rr, action, Role::Toggle, format!("{title}, {sub}"));
+        hit.value = Some(if on { 1.0 } else { 0.0 });
+    }
+    // Right: Focus module + two square modules.
+    let focus = Rect::new(left.right() + pad, left.y, col_w, 62.0);
+    module(ui, &mm, focus);
+    circle_toggle(ui, &mm, (focus.x + 23.0, focus.cy()), data.dnd, "weather-clear-night-symbolic");
+    ui.text(Rect::new(focus.x + 44.0, focus.y, focus.w - 50.0, focus.h), "Focus", &Text::new(13.0, mm.label).bold());
+    let fk = ui::id("mac.cc.focus");
+    let hit = ui.hit(fk, focus, Action::ToggleDnd, Role::Toggle, "Focus");
+    hit.value = Some(if data.dnd { 1.0 } else { 0.0 });
+    let sq_w = (col_w - pad) / 2.0;
+    let squares: [(&str, &str, bool, Action); 2] = [
+        ("night-light-symbolic", "Night Shift", data.night_light, Action::ToggleNightLight),
+        ("view-dual-symbolic", "Layouts", false, Action::Open(Kind::Snap)),
+    ];
+    for (i, (icon, label, on, action)) in squares.into_iter().enumerate() {
+        let sq = Rect::new(focus.x + i as f64 * (sq_w + pad), focus.bottom() + pad, sq_w, 136.0 - 62.0 - pad);
+        module(ui, &mm, sq);
+        circle_toggle(ui, &mm, (sq.cx(), sq.y + 24.0), on, icon);
+        ui.text(Rect::new(sq.x + 2.0, sq.bottom() - 24.0, sq.w - 4.0, 18.0), label, &Text::new(11.0, mm.label).center());
+        let k = ui::idn("mac.cc.sq", i);
+        let hit = ui.hit(k, sq, action, Role::Toggle, label);
+        hit.value = Some(if on { 1.0 } else { 0.0 });
+    }
+    // Display + Sound modules.
+    let mut y = left.bottom() + pad;
+    let slider_module = |ui: &mut Ui, y: f64, title: &str, v: Option<f64>, which: Slider, key: &str, glyph: &dyn Fn(&cairo::Context, (f64, f64), Color)| {
+        let md = Rect::new(panel.x + pad, y, w - pad * 2.0, 68.0);
+        module(ui, &mm, md);
+        ui.text(Rect::new(md.x + 12.0, md.y + 8.0, md.w - 24.0, 18.0), title, &Text::new(13.0, mm.label).bold());
+        let sr = Rect::new(md.x + 12.0, md.y + 30.0, md.w - 24.0, 30.0);
+        match v {
+            Some(v) => {
+                let k = ui::id(key);
+                let vv = ui.spring(k ^ 0x5, v, v);
+                big_slider(ui, &mm, sr, vv, glyph);
+                let hit = ui.hit(k, sr, Action::Slider(which), Role::Slider, title.to_string());
+                hit.value = Some(v);
+            }
+            None => {
+                ui.text(sr, "Unavailable", &Text::new(11.0, mm.label2));
+            }
+        }
+    };
+    slider_module(ui, y, "Display", data.brightness, Slider::Brightness, "mac.cc.display", &|cr, c, col| glyph_sun(cr, c, 14.0, col));
+    y += 68.0 + pad;
+    let vol = data.audio.as_ref().map(|a| if a.muted { 0.0 } else { a.volume.min(1.0) });
+    slider_module(ui, y, "Sound", vol, Slider::Volume, "mac.cc.sound", &|cr, c, col| glyph_speaker(cr, c, 13.0, col, 1.0, false));
+    y += 68.0 + pad;
+    if let Some(md) = &data.media {
+        let r = Rect::new(panel.x + pad, y, w - pad * 2.0, 68.0);
+        module(ui, &mm, r);
+        let art = Rect::new(r.x + 12.0, r.y + 12.0, 44.0, 44.0);
+        gfx::fill_rounded(ui.cr, art, 8.0, mm.accent.with_alpha(0.3));
+        ui.icon(art, "audio-x-generic-symbolic", 20.0, Some(mm.label));
+        ui.text(Rect::new(art.right() + 10.0, r.y + 14.0, r.w - 140.0, 18.0), &md.title, &Text::new(13.0, mm.label).bold());
+        ui.text(Rect::new(art.right() + 10.0, r.y + 34.0, r.w - 140.0, 18.0), if md.artist.is_empty() { &md.player } else { &md.artist }, &Text::new(11.0, mm.label2));
+        for (i, (icon, label, a)) in [(if md.playing { "media-playback-pause-symbolic" } else { "media-playback-start-symbolic" }, "Play/Pause", Action::MediaPlayPause), ("media-skip-forward-symbolic", "Next", Action::MediaNext)].into_iter().enumerate() {
+            let b = Rect::new(r.right() - 76.0 + i as f64 * 34.0, r.cy() - 15.0, 30.0, 30.0);
+            let k = ui::idn("mac.cc.media", i);
+            ui.icon(b, icon, 16.0, Some(mm.label));
+            ui.hit(k, b, a, Role::Button, label);
+        }
+    }
+}
+
+fn panel_draw(ui: &mut Ui, mm: &M, r: Rect, base_radius: f64, element: &str) {
+    panel(ui, mm, r, panel_radius(mm, base_radius), element);
+}
+
+// ───────────────────────────── Spotlight ─────────────────────────────
+
+pub fn spotlight(ui: &mut Ui, t_open: f64, data: &Data, views: &mut Views) {
+    let mm = m(ui);
+    let (sw, sh) = ui.size;
+    let results = super::launcher::search(&data.apps, &views.query);
+    let special = super::launcher::special_label(&views.query);
+    let n = results.len() + special.is_some() as usize;
+    let show = !views.query.is_empty();
+    let rows = n.min(9);
+    let field_h = if mm.tahoe { 56.0 } else { 52.0 };
+    let w = if mm.tahoe { 640.0 } else { 680.0 };
+    let list_h = if show { if rows == 0 { 60.0 } else { rows as f64 * 30.0 + 16.0 } } else { 0.0 };
+    let x = ((sw - w) / 2.0).round();
+    let y = (sh * 0.22).round();
+    let field = Rect::new(x, y, w, field_h);
+    super::popup_transform(ui, field, t_open, true);
+    let radius = if mm.tahoe { field_h / 2.0 } else if mm.aqua { 8.0 } else { 12.0 };
+    let whole = if mm.tahoe { field } else { Rect::new(x, y, w, field_h + list_h) };
+    panel(ui, &mm, whole, radius, "launcher");
+    ui.record("launcher.panel", whole, None);
+    ui.hit(ui::id("launcher.panel"), whole, Action::None, Role::Group, "");
+    glyph_search(ui.cr, (field.x + 26.0, field.cy()), 20.0, mm.label2);
+    let q = format!("{}{}", views.query, views.preedit);
+    let tr = Rect::new(field.x + 48.0, field.y, field.w - 64.0, field.h);
+    let big = Text::new(if mm.tahoe { 20.0 } else { 22.0 }, mm.label);
+    if q.is_empty() {
+        ui.text(Rect::new(tr.x + 4.0, tr.y, tr.w - 4.0, tr.h), "Spotlight Search", &Text::new(big.size, mm.label3));
+        gfx::fill_rounded(ui.cr, Rect::new(tr.x, field.cy() - 12.0, 2.0, 24.0), 1.0, mm.accent);
+    } else {
+        let b = ui.text(tr, &q, &big);
+        gfx::fill_rounded(ui.cr, Rect::new(b.right() + 1.0, field.cy() - 12.0, 2.0, 24.0), 1.0, mm.accent);
+    }
+    ui.hit(ui::id("launcher.input"), field, Action::None, Role::Input, "Spotlight Search");
+    if mm.tahoe {
+        // Tahoe: four glass shortcut buttons beside the field.
+        let btns: [(&str, &str, Action); 4] = [
+            ("view-app-grid-symbolic", "Applications", Action::Exec("creed toggle launchpad".into())),
+            ("folder-documents-symbolic", "Files", Action::Exec(ui.th.cfg.general.file_manager.clone())),
+            ("system-run-symbolic", "Shortcuts", Action::Open(Kind::Snap)),
+            ("edit-paste-symbolic", "Clipboard", Action::Open(Kind::Clipboard)),
+        ];
+        for (i, (icon, label, a)) in btns.into_iter().enumerate() {
+            let b = Rect::new(field.right() + 10.0 + i as f64 * 54.0, field.y + 4.0, 48.0, 48.0);
+            ui.th.panel(ui.cr, b, 24.0, "launcher", ui.pointer);
+            ui.icon(b, icon, 20.0, Some(mm.label));
+            ui.hit(ui::idn("mac.sp.btn", i), b, a, Role::Button, label);
+        }
+    }
+    if !show {
+        return;
+    }
+    let list = if mm.tahoe {
+        let l = Rect::new(x, field.bottom() + 10.0, w, list_h);
+        panel(ui, &mm, l, 24.0, "launcher");
+        l.inset_xy(8.0, 8.0)
+    } else {
+        gfx::fill_rounded(ui.cr, Rect::new(x, field.bottom(), w, 1.0), 0.0, mm.stroke);
+        Rect::new(x + 8.0, field.bottom() + 8.0, w - 16.0, list_h - 16.0)
+    };
+    if n == 0 {
+        ui.text(list, "No Results", &Text::new(13.0, mm.label2).center());
+        return;
+    }
+    for i in 0..rows {
+        let r = Rect::new(list.x, list.y + i as f64 * 30.0, list.w, 28.0);
+        let sel = views.sel == i;
+        let k = ui::idn("mac.sp.row", i);
+        let hv = ui.hover_amt(k);
+        if sel {
+            gfx::fill_rounded(ui.cr, r, 6.0, mm.accent);
+        } else if hv > 0.01 {
+            gfx::fill_rounded(ui.cr, r, 6.0, mm.sel.with_alpha(mm.sel.a * hv));
+        }
+        let fg = if sel { Color::WHITE } else { mm.label };
+        let (icon, title) = match (i, special.as_ref()) {
+            (0, Some((t, _, ic))) => (ic.to_string(), t.clone()),
+            _ => {
+                let a = &data.apps[results[i - special.is_some() as usize]];
+                (a.icon.clone(), a.name.clone())
+            }
+        };
+        ui.icon(Rect::new(r.x + 8.0, r.y, 20.0, r.h), &icon, 20.0, if icon.ends_with("-symbolic") { Some(fg) } else { None });
+        ui.text(Rect::new(r.x + 36.0, r.y, r.w - 44.0, r.h), &title, &Text::new(13.0, fg));
+        ui.hit(k, r, Action::LauncherPick(i), Role::Item, title);
+    }
+}
+
+// ───────────────────────────── notifications ─────────────────────────────
+
+pub fn banner_height(n: &crate::data::Notif) -> f64 {
+    let lines = if n.body.is_empty() { 0.0 } else { ((n.body.chars().count() as f64) / 46.0).ceil().clamp(1.0, 2.0) };
+    (14.0 + 18.0 + lines * 17.0 + 14.0).max(64.0).round()
+}
+
+fn banner(ui: &mut Ui, mm: &M, r: Rect, n: &crate::data::Notif) {
+    let k = ui::idn("mac.banner", n.id);
+    let hv = ui.hover_amt(k);
+    panel(ui, mm, r, panel_radius(mm, 16.0), "notifications");
+    let icon = if n.icon.is_empty() { "dialog-information-symbolic".to_string() } else { n.icon.clone() };
+    ui.icon(Rect::new(r.x + 12.0, r.cy() - 16.0, 32.0, 32.0), &icon, 32.0, if icon.ends_with("-symbolic") { Some(mm.accent) } else { None });
+    let tx = r.x + 54.0;
+    ui.text(Rect::new(tx, r.y + 12.0, r.w - 54.0 - 50.0, 18.0), &n.summary, &Text::new(13.0, mm.label).bold());
+    ui.text(Rect::new(r.right() - 48.0, r.y + 12.0, 36.0, 18.0), &super::notif_ago(n.arrived), &Text::new(11.0, mm.label2).end());
+    if !n.body.is_empty() {
+        ui.text(Rect::new(tx, r.y + 31.0, r.w - 54.0 - 14.0, 34.0), &super::notif::strip_markup(&n.body), &Text::new(13.0, mm.label).lines(2));
+    }
+    let default = n.actions.iter().find(|(k, _)| k == "default").map(|(k, _)| Action::NotifAction(n.id, k.clone())).unwrap_or(Action::NotifDismiss(n.id));
+    ui.hit(k, r, default, Role::Item, format!("{}: {}", n.app, n.summary));
+    if hv > 0.05 {
+        // Close button on the top-left corner, as on macOS.
+        let x = Rect::centered(r.x + 2.0, r.y + 2.0, 20.0, 20.0);
+        gfx::fill_rounded(ui.cr, x, 10.0, if mm.dark { Color::rgba(0.3, 0.3, 0.3, hv) } else { Color::rgba(0.95, 0.95, 0.95, hv) });
+        gfx::stroke_rounded(ui.cr, x, 10.0, 0.5, mm.stroke);
+        ui.icon(x, "window-close-symbolic", 9.0, Some(mm.label.with_alpha(mm.label.a * hv)));
+        ui.hit(ui::idn("mac.banner.x", n.id), x, Action::NotifDismiss(n.id), Role::Button, "Close");
+    }
+}
+
+pub fn banners(ui: &mut Ui, data: &Data) {
+    let mm = m(ui);
+    let (sw, _) = ui.size;
+    let mut y = 10.0;
+    for n in &data.notifs {
+        let h = banner_height(n);
+        let a = ui.spring(ui::idn("mac.banner.in", n.id), 1.0, 0.0);
+        let r = Rect::new(sw - 344.0 - 12.0, y, 344.0, h);
+        ui.cr.save().ok();
+        ui.cr.push_group();
+        ui.cr.translate(((1.0 - a) * 360.0).round(), 0.0);
+        banner(ui, &mm, r, n);
+        let _ = ui.cr.pop_group_to_source();
+        let _ = ui.cr.paint();
+        ui.cr.restore().ok();
+        ui.record(&format!("notif.{}", n.id), r, None);
+        y += h + 10.0;
+    }
+}
+
+pub fn notif_center(ui: &mut Ui, t_open: f64, data: &Data, views: &mut Views) {
+    let mm = m(ui);
+    let (_, sh) = ui.size;
+    let col = below_bar(ui, 344.0);
+    let area = Rect::new(col.x, col.y, 344.0, sh - col.y - 12.0);
+    super::popup_transform(ui, area, t_open, true);
+    ui.record("notif-center.panel", area, None);
+    let mut y = area.y;
+    if !data.history.is_empty() {
+        let hdr = Rect::new(area.x + 4.0, y, area.w - 8.0, 28.0);
+        ui.text(hdr, "Notification Center", &Text::new(15.0, Color::WHITE).bold());
+        let ck = ui::id("mac.nc.clear");
+        let cr = Rect::new(hdr.right() - 80.0, hdr.y + 2.0, 80.0, 24.0);
+        let hv = ui.hover_amt(ck);
+        gfx::fill_rounded(ui.cr, cr, 12.0, Color::rgba(0.3, 0.3, 0.3, 0.6 + 0.2 * hv));
+        ui.text(cr, "Clear", &Text::new(11.0, Color::WHITE).center());
+        ui.hit(ck, cr, Action::NotifClear, Role::Button, "Clear all notifications");
+        y = hdr.bottom() + 8.0;
+        for n in data.history.iter().take(6) {
+            let h = banner_height(n);
+            banner(ui, &mm, Rect::new(area.x, y, area.w, h), n);
+            y += h + 8.0;
+        }
+        y += 6.0;
+    }
+    // Widgets: calendar (medium) + weather (small) like the default widget stack.
+    let wr = panel_radius(&mm, 20.0);
+    let cal = Rect::new(area.x, y, area.w, 172.0);
+    panel(ui, &mm, cal, wr, "dashboard");
+    ui.hit(ui::id("mac.nc.cal"), cal, Action::None, Role::Group, "");
+    super::calendar::draw_month(ui, cal.inset(10.0), views.calendar_offset);
+    y = cal.bottom() + 10.0;
+    if let Some(w) = &data.weather {
+        let wbox = Rect::new(area.x, y, (area.w - 10.0) / 2.0, 164.0);
+        let g = cairo::LinearGradient::new(0.0, wbox.y, 0.0, wbox.bottom());
+        g.add_color_stop_rgba(0.0, 0.29, 0.53, 0.86, 0.95);
+        g.add_color_stop_rgba(1.0, 0.18, 0.36, 0.7, 0.95);
+        gfx::rounded(ui.cr, wbox, wr);
+        let _ = ui.cr.set_source(&g);
+        let _ = ui.cr.fill();
+        ui.text(Rect::new(wbox.x + 14.0, wbox.y + 12.0, wbox.w - 28.0, 18.0), &w.place, &Text::new(13.0, Color::WHITE).bold());
+        ui.text(Rect::new(wbox.x + 14.0, wbox.y + 30.0, wbox.w - 28.0, 44.0), &w.temp, &Text::new(38.0, Color::WHITE));
+        ui.icon(Rect::new(wbox.x + 14.0, wbox.bottom() - 58.0, 18.0, 18.0), &w.icon, 16.0, Some(Color::WHITE));
+        ui.text(Rect::new(wbox.x + 14.0, wbox.bottom() - 40.0, wbox.w - 28.0, 16.0), &w.desc, &Text::new(11.0, Color::WHITE));
+        ui.text(Rect::new(wbox.x + 14.0, wbox.bottom() - 24.0, wbox.w - 28.0, 16.0), &w.hi_lo, &Text::new(11.0, Color::WHITE));
+        ui.hit(ui::id("mac.nc.weather"), wbox, Action::None, Role::Label, format!("Weather {} {}", w.temp, w.desc));
+    }
+}
+
+// ───────────────────────────── volume HUD ─────────────────────────────
+
+pub const OSD_SIZE: (u32, u32) = (300, 64);
+
+pub fn osd(ui: &mut Ui, kind: crate::data::OsdKind, value: f64) {
+    let mm = m(ui);
+    let (w, h) = ui.size;
+    let r = Rect::new(4.0, 4.0, w - 8.0, h - 8.0);
+    panel(ui, &mm, r, panel_radius(&mm, 14.0), "osd");
+    let title = match kind {
+        crate::data::OsdKind::Brightness => "Display",
+        crate::data::OsdKind::Game => "Game Mode",
+        _ => "Sound",
+    };
+    ui.text(Rect::new(r.x + 14.0, r.y + 6.0, r.w - 28.0, 18.0), title, &Text::new(13.0, mm.label).bold());
+    let v = ui.spring(ui::id("mac.osd"), value.clamp(0.0, 1.0), value.clamp(0.0, 1.0));
+    let sr = Rect::new(r.x + 14.0, r.y + 26.0, r.w - 28.0, 26.0);
+    match kind {
+        crate::data::OsdKind::Brightness => big_slider(ui, &mm, sr, v, &|cr, c, col| glyph_sun(cr, c, 14.0, col)),
+        _ => big_slider(ui, &mm, sr, v, &|cr, c, col| glyph_speaker(cr, c, 13.0, col, 1.0, false)),
+    }
+}

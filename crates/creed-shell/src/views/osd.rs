@@ -7,6 +7,22 @@ use crate::ui::{self, Ui};
 use smithay_client_toolkit::shell::wlr_layer::{Anchor, KeyboardInteractivity, Layer};
 
 pub fn spec(th: &gfx::Theme, _ow: u32, _oh: u32) -> Spec {
+    let bar = (th.cfg.bar.size + th.cfg.bar.margin) as i32;
+    match th.cfg.style.osd.as_str() {
+        "win11" => {
+            let (w, h) = super::win11::OSD_SIZE;
+            return Spec { layer: Layer::Overlay, anchor: Anchor::BOTTOM, size: (w, h), margin: (0, 0, 24, 0), exclusive: 0, keyboard: KeyboardInteractivity::None, namespace: "creed-osd", click_through: true };
+        }
+        "win10" => {
+            let (w, h) = super::win10::OSD_SIZE;
+            return Spec { layer: Layer::Overlay, anchor: Anchor::TOP | Anchor::LEFT, size: (w, h), margin: (56, 0, 0, 56), exclusive: -1, keyboard: KeyboardInteractivity::None, namespace: "creed-osd", click_through: true };
+        }
+        "mac" => {
+            let (w, h) = super::mac::OSD_SIZE;
+            return Spec { layer: Layer::Overlay, anchor: Anchor::TOP | Anchor::RIGHT, size: (w, h), margin: (bar + 4, 6, 0, 0), exclusive: -1, keyboard: KeyboardInteractivity::None, namespace: "creed-osd", click_through: true };
+        }
+        _ => {}
+    }
     let bottom_bar = th.cfg.bar.position == creed_core::config::Edge::Bottom;
     let dock = if th.cfg.dock.enabled && th.cfg.style.dock != "none" { th.cfg.dock.icon_size + 40 } else { 0 };
     let off = if bottom_bar { th.cfg.bar.size + th.cfg.bar.margin } else { 0 } + dock + 24;
@@ -25,6 +41,20 @@ pub fn spec(th: &gfx::Theme, _ow: u32, _oh: u32) -> Spec {
 pub fn draw(ui: &mut Ui, closing: bool, data: &Data) {
     let t = super::open_amount(ui, closing);
     let Some((kind, value, _)) = data.osd else { return };
+    let variant = ui.th.cfg.style.osd.clone();
+    if matches!(variant.as_str(), "win11" | "win10" | "mac") {
+        ui.cr.save().ok();
+        ui.cr.push_group();
+        match variant.as_str() {
+            "win11" => super::win11::osd(ui, kind, value),
+            "win10" => super::win10::osd(ui, kind, value),
+            _ => super::mac::osd(ui, kind, value),
+        }
+        let _ = ui.cr.pop_group_to_source();
+        let _ = ui.cr.paint_with_alpha(t.clamp(0.0, 1.0));
+        ui.cr.restore().ok();
+        return;
+    }
     let th = ui.th;
     let (w, h) = ui.size;
     let panel = Rect::new(4.0, 4.0, w - 8.0, h - 8.0);

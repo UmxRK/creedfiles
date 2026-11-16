@@ -367,6 +367,11 @@ pub fn render_all(paths: &Paths, cfg: &Config, pal: &Palette, hw: &Hardware, hav
 
 /// Palette for a config (same rules the shell uses).
 pub fn palette_for(paths: &Paths, cfg: &Config) -> Palette {
+    if let Some(name) = &cfg.style.palette {
+        if let Some(p) = palette::system(name, cfg.scheme()) {
+            return with_accent(p, cfg.appearance.accent);
+        }
+    }
     let preset = cfg.style.palette.clone().unwrap_or_else(|| cfg.appearance.preset.clone());
     let wp = &cfg.appearance.wallpaper;
     let seed = if cfg.style.palette.is_some() || cfg.appearance.color_source == crate::config::ColorSource::Preset {
@@ -438,4 +443,13 @@ mod tests {
         cfg.appearance.motion = Motion::Expressive;
         assert!(animations_block(&cfg, "macos").contains("popin 85%"));
     }
+}
+
+/// Applies a user accent override to a fixed system palette.
+pub fn with_accent(mut p: Palette, accent: Option<Color>) -> Palette {
+    if let Some(a) = accent {
+        p.accent = a;
+        p.on_accent = if a.contrast(&Color::WHITE) >= a.contrast(&Color::BLACK) { Color::WHITE } else { Color::BLACK };
+    }
+    p
 }

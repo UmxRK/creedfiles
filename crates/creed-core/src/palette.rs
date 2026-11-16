@@ -114,6 +114,76 @@ pub fn seed_from_pixels(pixels: impl Iterator<Item = (u8, u8, u8)>) -> Seed {
     Seed { hue, alt_hue: alt, tint: 1.0, accent_chroma: (avg_chroma * 1.6).clamp(0.08, 0.15), fixed_accent: None }
 }
 
+fn c(h: &str) -> Color {
+    Color::parse(h).unwrap_or(Color::BLACK)
+}
+
+fn term(list: [&str; 16]) -> [Color; 16] {
+    let mut t = [Color::BLACK; 16];
+    for (i, h) in list.iter().enumerate() {
+        t[i] = c(h);
+    }
+    t
+}
+
+/// Windows Terminal "Campbell" - the Windows default console scheme.
+const CAMPBELL: [&str; 16] = ["#0c0c0c", "#c50f1f", "#13a10e", "#c19c00", "#0037da", "#881798", "#3a96dd", "#cccccc", "#767676", "#e74856", "#16c60c", "#f9f1a5", "#3b78ff", "#b4009e", "#61d6d6", "#f2f2f2"];
+/// macOS Terminal "Basic" profile ANSI colours.
+const MAC_TERMINAL: [&str; 16] = ["#000000", "#990000", "#00a600", "#999900", "#0000b2", "#b200b2", "#00a6b2", "#bfbfbf", "#666666", "#e50000", "#00d900", "#e5e500", "#0000ff", "#e500e5", "#00e5e5", "#e5e5e5"];
+
+/// Exact system palettes for the OS look-alike modes (no generated tones):
+/// Windows values come from Microsoft's WinUI theme resources (Common_themeresources_any.xaml),
+/// macOS values from Apple's documented NSColor system/label colours.
+pub fn system(name: &str, scheme: Scheme) -> Option<Palette> {
+    let dark = scheme == Scheme::Dark;
+    let p = match (name, dark) {
+        ("windows11", true) => Palette {
+            scheme, bg: c("#202020"), surface: c("#2c2c2c"), surface_alt: c("#383838"), overlay: c("#ffffff15"),
+            border: c("#ffffff12"), text: c("#ffffff"), subtext: c("#ffffffc5"), muted: c("#ffffff87"),
+            accent: c("#4cc2ff"), accent_alt: c("#99ebff"), on_accent: c("#000000"),
+            success: c("#6ccb5f"), warning: c("#fce100"), error: c("#ff99a4"), shadow: c("#00000066"), term: term(CAMPBELL),
+        },
+        ("windows11", false) => Palette {
+            scheme, bg: c("#f3f3f3"), surface: c("#f9f9f9"), surface_alt: c("#ffffff"), overlay: c("#00000009"),
+            border: c("#0000000f"), text: c("#000000e4"), subtext: c("#0000009e"), muted: c("#00000072"),
+            accent: c("#005fb8"), accent_alt: c("#003e92"), on_accent: c("#ffffff"),
+            success: c("#0f7b0f"), warning: c("#9d5d00"), error: c("#c42b1c"), shadow: c("#00000024"), term: term(CAMPBELL),
+        },
+        ("windows10", true) => Palette {
+            scheme, bg: c("#101010"), surface: c("#1f1f1f"), surface_alt: c("#2b2b2b"), overlay: c("#ffffff1a"),
+            border: c("#ffffff1a"), text: c("#ffffff"), subtext: c("#ffffffb3"), muted: c("#ffffff80"),
+            accent: c("#0078d7"), accent_alt: c("#429ce3"), on_accent: c("#ffffff"),
+            success: c("#16c60c"), warning: c("#ffb900"), error: c("#e81123"), shadow: c("#00000080"), term: term(CAMPBELL),
+        },
+        ("windows10", false) => Palette {
+            scheme, bg: c("#f0f0f0"), surface: c("#e4e4e4"), surface_alt: c("#ffffff"), overlay: c("#0000001a"),
+            border: c("#0000001a"), text: c("#000000"), subtext: c("#000000b3"), muted: c("#00000080"),
+            accent: c("#0078d7"), accent_alt: c("#005a9e"), on_accent: c("#ffffff"),
+            success: c("#107c10"), warning: c("#9d5d00"), error: c("#e81123"), shadow: c("#00000040"), term: term(CAMPBELL),
+        },
+        ("macos", true) => Palette {
+            scheme, bg: c("#1e1e1e"), surface: c("#282828"), surface_alt: c("#323232"), overlay: c("#ffffff1a"),
+            border: c("#ffffff1a"), text: c("#ffffffd9"), subtext: c("#ffffff8c"), muted: c("#ffffff40"),
+            accent: c("#0a84ff"), accent_alt: c("#409cff"), on_accent: c("#ffffff"),
+            success: c("#32d74b"), warning: c("#ffd60a"), error: c("#ff453a"), shadow: c("#00000059"), term: term(MAC_TERMINAL),
+        },
+        ("macos", false) => Palette {
+            scheme, bg: c("#ececec"), surface: c("#f6f6f6"), surface_alt: c("#ffffff"), overlay: c("#0000000d"),
+            border: c("#0000001a"), text: c("#000000d9"), subtext: c("#00000080"), muted: c("#00000040"),
+            accent: c("#007aff"), accent_alt: c("#0064d1"), on_accent: c("#ffffff"),
+            success: c("#34c759"), warning: c("#ffcc00"), error: c("#ff3b30"), shadow: c("#00000033"), term: term(MAC_TERMINAL),
+        },
+        ("aqua", _) => Palette {
+            scheme, bg: c("#e8e8e8"), surface: c("#ededed"), surface_alt: c("#ffffff"), overlay: c("#0000000f"),
+            border: c("#00000033"), text: c("#000000"), subtext: c("#000000a6"), muted: c("#00000066"),
+            accent: c("#3875d7"), accent_alt: c("#6fa0e8"), on_accent: c("#ffffff"),
+            success: c("#28a745"), warning: c("#f5a623"), error: c("#e0443e"), shadow: c("#00000059"), term: term(MAC_TERMINAL),
+        },
+        _ => return None,
+    };
+    Some(p)
+}
+
 impl Palette {
     pub fn generate(seed: Seed, scheme: Scheme, high_contrast: bool, accent_override: Option<Color>) -> Palette {
         let dark = scheme == Scheme::Dark;
@@ -266,6 +336,17 @@ mod tests {
     fn greyscale_is_neutralish() {
         let s = seed_from_pixels(std::iter::repeat((128, 128, 128)).take(100));
         assert!(s.tint < 0.5);
+    }
+
+    #[test]
+    fn system_palettes_exact() {
+        let w = system("windows11", Scheme::Dark).unwrap();
+        assert_eq!(w.bg.to_hex(), "#202020");
+        assert_eq!(w.accent.to_hex(), "#4cc2ff");
+        assert_eq!(system("windows11", Scheme::Light).unwrap().accent.to_hex(), "#005fb8");
+        assert_eq!(system("macos", Scheme::Dark).unwrap().accent.to_hex(), "#0a84ff");
+        assert_eq!(system("windows10", Scheme::Dark).unwrap().term[1].to_hex(), "#c50f1f");
+        assert!(system("nope", Scheme::Dark).is_none());
     }
 
     #[test]

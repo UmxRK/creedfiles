@@ -126,6 +126,79 @@ pub fn scan() -> Vec<AppEntry> {
     apps
 }
 
+fn url_decode(s: &str) -> String {
+    let b = s.as_bytes();
+    let mut out = Vec::with_capacity(b.len());
+    let mut i = 0;
+    while i < b.len() {
+        if b[i] == b'%' && i + 2 < b.len() {
+            if let Ok(v) = u8::from_str_radix(&s[i + 1..i + 3], 16) {
+                out.push(v);
+                i += 3;
+                continue;
+            }
+        }
+        out.push(b[i]);
+        i += 1;
+    }
+    String::from_utf8_lossy(&out).to_string()
+}
+
+/// Parses GTK's recently-used.xbel: newest first, existing local files only.
+pub fn parse_recent(xml: &str, now: i64) -> Vec<(String, String, String)> {
+    let mut items: Vec<(String, String, i64)> = vec![];
+    for chunk in xml.split("<bookmark ").skip(1) {
+        let attr = |name: &str| chunk.split(&format!("{name}=\"")).nth(1).and_then(|r| r.split('"').next()).map(str::to_string);
+        let Some(href) = attr("href") else { continue };
+        let Some(path) = href.strip_prefix("file://").map(url_decode) else { continue };
+        let when = attr("modified").or_else(|| attr("visited")).unwrap_or_default();
+        let ts = parse_iso(&when).unwrap_or(0);
+        let name = path.rsplit('/').next().unwrap_or(&path).to_string();
+        if !std::path::Path::new(&path).is_file() {
+            continue;
+        }
+        items.push((path, name, ts));
+    }
+    items.sort_by(|a, b| b.2.cmp(&a.2));
+    items.dedup_by(|a, b| a.0 == b.0);
+    items
+        .into_iter()
+        .take(8)
+        .map(|(p, n, ts)| {
+            let age = (now - ts).max(0);
+            let when = if age < 3600 { format!("{}m ago", (age / 60).max(1)) } else if age < 86400 { format!("{}h ago", age / 3600) } else { crate::time::format(ts, "%d %b") };
+            (p, n, when)
+        })
+        .collect()
+}
+
+/// Minimal ISO-8601 (YYYY-MM-DDTHH:MM:SS…Z) → unix seconds, UTC.
+fn parse_iso(s: &str) -> Option<i64> {
+    let y: i64 = s.get(0..4)?.parse().ok()?;
+    let mo: i64 = s.get(5..7)?.parse().ok()?;
+    let d: i64 = s.get(8..10)?.parse().ok()?;
+    let h: i64 = s.get(11..13)?.parse().ok()?;
+    let mi: i64 = s.get(14..16)?.parse().ok()?;
+    let se: i64 = s.get(17..19)?.parse().ok()?;
+    // days from civil (Howard Hinnant)
+    let y2 = if mo <= 2 { y - 1 } else { y };
+    let era = y2.div_euclid(400);
+    let yoe = y2 - era * 400;
+    let doy = (153 * (mo + if mo > 2 { -3 } else { 9 }) + 2) / 5 + d - 1;
+    let doe = yoe * 365 + yoe / 4 - yoe / 100 + doy;
+    let days = era * 146097 + doe - 719468;
+    Some(days * 86400 + h * 3600 + mi * 60 + se)
+}
+
+pub fn refresh_recent(tx: Sender<Msg>) {
+    std::thread::spawn(move || {
+        let home = std::env::var("HOME").unwrap_or_default();
+        let base = std::env::var("XDG_DATA_HOME").unwrap_or_else(|_| format!("{home}/.local/share"));
+        let xml = fs::read_to_string(format!("{base}/recently-used.xbel")).unwrap_or_default();
+        let _ = tx.send(Msg::Recent(parse_recent(&xml, crate::time::now_secs())));
+    });
+}
+
 pub fn refresh(tx: Sender<Msg>) {
     std::thread::spawn(move || {
         let _ = tx.send(Msg::Apps(scan()));
@@ -192,5 +265,14 @@ mod tests {
         assert!(parse("x", "[Desktop Entry]\nType=Application\nName=X\nExec=x\nOnlyShowIn=KDE;\n", "").is_none());
         assert!(parse("x", "[Desktop Entry]\nType=Application\nName=X\nExec=x\nTryExec=/definitely/missing\n", "").is_none());
         assert_eq!(clean_exec("firefox %u --x 100%% %F"), "firefox --x 100%");
+        assert_eq!(parse_iso("1970-01-02T00:00:10Z"), Some(86410));
+        assert_eq!(parse_iso("2026-11-16T12:00:00.123Z"), Some(1794830400));
+        let f = std::env::temp_dir().join("creed recent test.txt");
+        std::fs::write(&f, "x").unwrap();
+        let xml = format!("<xbel><bookmark href=\"file://{}\" modified=\"2026-11-16T10:00:00Z\"/><bookmark href=\"file:///nope/missing.txt\" modified=\"2026-11-16T11:00:00Z\"/></xbel>", f.display().to_string().replace(' ', "%20"));
+        let r = parse_recent(&xml, 1794830400);
+        assert_eq!(r.len(), 1);
+        assert_eq!(r[0].1, "creed recent test.txt");
+        assert_eq!(r[0].2, "2h ago");
     }
 }

@@ -14,15 +14,15 @@ font = "Inter"
 
 [bar]
 position = "top"
-style = "floating"
-size = 30
-margin = 6
+style = "edge"
+size = 24
+margin = 0
 radius = 15
 left = ["launcher", "appmenu"]
 center = []
-right = ["tray", "media", "battery", "network", "control", "search", "clock"]
+right = ["tray", "media", "battery", "network", "volume", "control", "search", "clock"]
 clock_format = "%H:%M"
-date_format = "%a %d %b"
+date_format = "%a %-d %b"
 
 [dock]
 enabled = true
@@ -77,3 +77,4 @@ window_gaps_in = 6
 window_gaps_out = 10
 window_rounding = 18
 window_border = 0
+font = "SF Pro Text, SF Pro, Inter"

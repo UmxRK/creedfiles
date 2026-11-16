@@ -79,7 +79,10 @@ pub fn start_all(tx: &Sender<Msg>, cfg: &Config) {
 /// Things to refresh right before a surface opens.
 pub fn on_open(kind: Kind, tx: &Sender<Msg>, _cfg: &Config) {
     match kind {
-        Kind::Launcher | Kind::Overview => apps::refresh(tx.clone()),
+        Kind::Launcher | Kind::Overview => {
+            apps::refresh(tx.clone());
+            apps::refresh_recent(tx.clone());
+        }
         Kind::Control => {
             network::scan(tx.clone());
             power::refresh_profile(tx);

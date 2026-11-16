@@ -8,6 +8,12 @@ pub mod control;
 pub mod dashboard;
 pub mod dock;
 pub mod emoji;
+pub mod fluent;
+pub mod mac;
+pub mod win10;
+pub mod win11;
+
+pub use notif::ago as notif_ago;
 pub mod launcher;
 pub mod menu;
 pub mod notif;

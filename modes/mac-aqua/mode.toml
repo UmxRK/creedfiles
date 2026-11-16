@@ -16,14 +16,14 @@ font = "Inter"
 [bar]
 position = "top"
 style = "edge"
-size = 24
+size = 22
 margin = 0
 radius = 0
 left = ["launcher", "appmenu"]
 center = []
-right = ["tray", "battery", "network", "volume", "clock", "search"]
+right = ["tray", "media", "battery", "network", "volume", "control", "search", "clock"]
 clock_format = "%H:%M"
-date_format = "%a %d %b"
+date_format = "%a %-d %b"
 
 [dock]
 enabled = true
@@ -69,3 +69,4 @@ window_gaps_in = 5
 window_gaps_out = 8
 window_rounding = 8
 window_border = 0
+font = "Lucida Grande, Inter"

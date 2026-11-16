@@ -66,6 +66,7 @@ pub enum Msg {
     Tray(Vec<TrayItem>),
     Menu(String, Vec<MenuEntry>),
     Apps(Vec<AppEntry>),
+    Recent(Vec<(String, String, String)>),
     Clips(Vec<(String, String)>),
     Sys(SysStat),
     Weather(Option<WeatherNow>),
@@ -168,6 +169,11 @@ pub fn load_theme(paths: &Paths) -> (Theme, Option<String>) {
 }
 
 pub fn make_palette(paths: &Paths, cfg: &Config) -> Palette {
+    if let Some(name) = &cfg.style.palette {
+        if let Some(p) = palette::system(name, cfg.scheme()) {
+            return creed_core::theme::with_accent(p, cfg.appearance.accent);
+        }
+    }
     let preset_name = cfg.style.palette.clone().unwrap_or_else(|| cfg.appearance.preset.clone());
     let seed = if cfg.style.palette.is_some() || cfg.appearance.color_source == ColorSource::Preset {
         palette::preset_seed(&preset_name)
@@ -1122,6 +1128,10 @@ impl App {
                 self.respec(Kind::Launcher);
                 self.respec(Kind::Dock);
                 self.respec(Kind::Overview);
+            }
+            Msg::Recent(r) => {
+                self.data.recent = r;
+                self.mark(Kind::Launcher);
             }
             Msg::Clips(c) => {
                 self.data.clips = c;

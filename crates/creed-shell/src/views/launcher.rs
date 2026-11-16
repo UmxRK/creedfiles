@@ -164,8 +164,9 @@ pub fn draw(ui: &mut Ui, closing: bool, data: &Data, views: &mut Views) {
     ui.cr.save().ok();
     ui.cr.push_group();
     match variant.as_str() {
-        "start11" => draw_start11(ui, t, data, views),
-        "start10" => draw_start10(ui, t, data, views),
+        "start11" => super::win11::start(ui, t, data, views),
+        "start10" => super::win10::start(ui, t, data, views),
+        "spotlight" | "aqua" => super::mac::spotlight(ui, t, data, views),
         _ => draw_card(ui, t, data, views, &variant),
     }
     let _ = ui.cr.pop_group_to_source();
@@ -353,6 +354,10 @@ fn draw_start10(ui: &mut Ui, t: f64, data: &Data, views: &mut Views) {
         ui.text(Rect::new(r.x + 8.0, r.bottom() - 24.0, r.w - 16.0, 20.0), &a.name, &Text::new(th.fs * 0.85, th.pal.on_accent));
         ui.hit(k, r, Action::Launch(a.id.clone()), Role::Button, a.name.clone());
     }
+}
+
+pub fn draw_results_list_pub(ui: &mut Ui, area: Rect, data: &Data, views: &mut Views) {
+    draw_results_list(ui, area, data, views)
 }
 
 fn draw_results_list(ui: &mut Ui, area: Rect, data: &Data, views: &mut Views) {
