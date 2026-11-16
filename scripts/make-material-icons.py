@@ -92,6 +92,17 @@ MAP = {
     "drive-harddisk-symbolic": ("hard_drive", False),
     "swap-symbolic": ("swap_horiz", False),
     "music-note-symbolic": ("music_note", False),
+    "cpu-symbolic": ("developer_board", False),
+    "settings-symbolic": ("settings", False),
+    "power-symbolic": ("power_settings_new", False),
+    "edit-delete-symbolic": ("delete", False),
+    "checkbox-symbolic": ("check_box_outline_blank", False),
+    "translate-symbolic": ("translate", False),
+    "widgets-symbolic": ("widgets", False),
+    "build-symbolic": ("build", False),
+    "audio-card-symbolic": ("instant_mix", False),
+    "dock-left-symbolic": ("left_panel_open", False),
+    "tune-symbolic": ("tune", False),
 }
 for lvl in range(0, 101, 10):
     icon = "battery_full" if lvl >= 95 else f"battery_{max(0, min(6, round(lvl / 100 * 6)))}_bar"

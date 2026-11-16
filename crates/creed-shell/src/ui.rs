@@ -147,6 +147,11 @@ pub enum Action {
     Snap(u32, u32),
     Calendar(i32),
     VolumeStep(f64),
+    /// Material sidebar rail: 0 calendar, 1 to-do.
+    SideTab(u8),
+    TodoAdd,
+    TodoToggle(usize),
+    TodoDelete(usize),
     BrightnessStep(f64),
     Mode(String),
 }

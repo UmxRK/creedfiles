@@ -267,6 +267,10 @@ fn wifi_page(ui: &mut Ui, r: Rect, data: &Data, views: &mut Views) {
     super::clip_hits(ui, from, rest);
 }
 
+pub fn bt_page_pub(ui: &mut Ui, r: Rect, data: &Data) {
+    bt_page(ui, r, data)
+}
+
 fn bt_page(ui: &mut Ui, r: Rect, data: &Data) {
     let rest = page_header(ui, r, "Bluetooth");
     match &data.bt {

@@ -103,7 +103,7 @@ hardware_summary() {
 PKGS_CORE=(base-devel hyprland hyprlock hypridle xdg-desktop-portal-hyprland xdg-desktop-portal-gtk
   qt5-wayland qt6-wayland qt6ct polkit wireplumber pipewire pipewire-pulse libpulse
   networkmanager bluez bluez-utils brightnessctl playerctl power-profiles-daemon
-  grim slurp wl-clipboard cliphist libnotify jq curl git rust gum sassc
+  grim slurp hyprpicker wl-clipboard cliphist libnotify jq curl git rust gum sassc
   python python-gobject gtk4 libadwaita cairo pango
   inter-font ttf-jetbrains-mono noto-fonts noto-fonts-emoji papirus-icon-theme adwaita-icon-theme adw-gtk-theme
   foot thunar gvfs starship btop pacman-contrib zram-generator)

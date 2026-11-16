@@ -25,4 +25,7 @@ pub const BAR_MODULES: &[&str] = &[
     "control",      // control center toggle
     "power",        // power menu
     "spacer",
+    "resources",    // RAM / disk / CPU rings (Material layout)
+    "utilities",    // screenshot · colour picker · clipboard buttons
+    "status",       // mic · volume · network · bluetooth · battery in one pill
 ];

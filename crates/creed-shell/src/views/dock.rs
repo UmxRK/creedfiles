@@ -61,7 +61,7 @@ pub fn spec(th: &gfx::Theme, data: &Data, views: &Views, ow: u32, oh: u32) -> Sp
         exclusive: if d.autohide { 0 } else { (thick + margin) as i32 },
         keyboard: KeyboardInteractivity::None,
         namespace: "creed-dock",
-        click_through: false,
+        click_through: false, input: None,
     }
 }
 

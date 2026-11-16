@@ -1,9 +1,10 @@
-# Creed - the original look. Soft, playful, warm.
+# Creed - Material You on Hyprland (in the style of end-4's illogical-impulse):
+# colours from your wallpaper, a flush bar, full-height sidebars, pills everywhere.
 
 [meta]
 name = "Creed"
 family = "creed"
-description = "Creed's own look: soft rounded pills, warm colours from your wallpaper and springy motion."
+description = "Material You: colours from your wallpaper, a flush top bar with resources, media and workspaces, and full-height sidebars for quick settings, notifications, the calendar and widgets."
 preview = "preview.png"
 
 [appearance]
@@ -13,18 +14,19 @@ motion = "expressive"
 
 [bar]
 position = "top"
-style = "floating"
-size = 38
-margin = 8
-radius = 19
-left = ["launcher", "workspaces", "window"]
-center = ["clock"]
-right = ["tray", "media", "network", "bluetooth", "volume", "battery", "notifications", "control"]
+style = "edge"
+size = 40
+margin = 0
+radius = 0
+workspaces = 10
+left = ["window"]
+center = ["resources", "media", "workspaces", "clock", "utilities"]
+right = ["tray", "keyboard", "status"]
 clock_format = "%H:%M"
-date_format = "%a %d %b"
+date_format = "%A, %d/%m"
 
 [dock]
-enabled = true
+enabled = false
 position = "bottom"
 icon_size = 44
 magnify = 1.0
@@ -36,8 +38,8 @@ frost = 0.78
 specular = 0.25
 
 [style]
-radius = 18
-radius_small = 11
+radius = 20
+radius_small = 12
 spacing = 8
 padding = 12
 material = "frost"
@@ -48,14 +50,14 @@ cursor_theme = "Adwaita"
 gtk_theme = "adw-gtk3{-dark}"
 shell_icons = "Creed-Material"
 font = "Rubik, Inter"
-bar = "creed"
+bar = "material"
 dock = "creed"
 launcher = "creed"
-control = "creed"
+control = "sidebar"
 overview = "creed"
-dashboard = "creed"
-notifications = "creed"
-osd = "creed"
+dashboard = "sidebar"
+notifications = "material"
+osd = "material"
 window_gaps_in = 5
 window_gaps_out = 12
 window_rounding = 16

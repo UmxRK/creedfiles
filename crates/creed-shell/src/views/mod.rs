@@ -10,6 +10,8 @@ pub mod dock;
 pub mod emoji;
 pub mod fluent;
 pub mod mac;
+pub mod material;
+pub mod todo;
 pub mod win10;
 pub mod win11;
 
@@ -41,6 +43,8 @@ pub struct Spec {
     pub keyboard: KeyboardInteractivity,
     pub namespace: &'static str,
     pub click_through: bool,
+    /// Input region (x, y, w, h) in surface coordinates; None = the whole surface.
+    pub input: Option<(i32, i32, i32, i32)>,
 }
 
 impl Spec {
@@ -53,7 +57,7 @@ impl Spec {
             exclusive: -1,
             keyboard: KeyboardInteractivity::Exclusive,
             namespace: ns,
-            click_through: false,
+            click_through: false, input: None,
         }
     }
 }
@@ -76,6 +80,8 @@ pub struct Views {
     pub overview_launchpad: bool,
     /// Open macOS app menu: (menu title, x of its title in the bar).
     pub app_menu: Option<(String, f64)>,
+    /// Material sidebar: 0 calendar, 1 to-do.
+    pub side_tab: u8,
 }
 
 impl Views {
@@ -242,6 +248,7 @@ impl Views {
                         }
                     }
                     Kind::Power => power::ITEMS.get(self.sel).map(|i| Action::Power(i.0)),
+                    Kind::Control if self.side_tab == 1 && !self.query.trim().is_empty() => Some(Action::TodoAdd),
                     _ => None,
                 };
             }
@@ -287,7 +294,7 @@ pub fn spec(kind: Kind, th: &gfx::Theme, data: &Data, views: &Views, ow: u32, oh
             exclusive: -1,
             keyboard: KeyboardInteractivity::None,
             namespace: "creed-wallpaper",
-            click_through: false,
+            click_through: false, input: None,
         },
         Kind::Bar => bar::spec(th, ow, oh),
         Kind::Dock => dock::spec(th, data, views, ow, oh),
@@ -362,9 +369,16 @@ pub fn draw(ui: &mut Ui, kind: Kind, closing: bool, data: &Data, views: &mut Vie
         Kind::Bar => bar::draw(ui, data, views, cfg_err),
         Kind::Dock => dock::draw(ui, data, views),
         Kind::Launcher => launcher::draw(ui, closing, data, views),
+        Kind::Control if th_is(ui, "control", "sidebar") => sidebar(ui, closing, data, views, true),
         Kind::Control => control::draw(ui, closing, data, views),
+        Kind::Dashboard if th_is(ui, "dashboard", "sidebar") => sidebar(ui, closing, data, views, false),
         Kind::Dashboard => dashboard::draw(ui, closing, data, views),
         Kind::Notifications => notif::draw_popups(ui, data),
+        Kind::NotifCenter if th_is(ui, "notifications", "material") => {
+            // Material: notifications live in the right sidebar.
+            views.page = 0;
+            sidebar(ui, closing, data, views, true)
+        }
         Kind::NotifCenter => notif::draw_center(ui, closing, data, views),
         Kind::Overview => overview::draw(ui, closing, data, views),
         Kind::Osd => osd::draw(ui, closing, data),
@@ -378,6 +392,27 @@ pub fn draw(ui: &mut Ui, kind: Kind, closing: bool, data: &Data, views: &mut Vie
 }
 
 /// Empty-state message centred in `r`.
+fn th_is(ui: &Ui, which: &str, v: &str) -> bool {
+    ui.th.variant(which) == v
+}
+
+/// Material sidebars (right: control + notifications + calendar, left: widgets + tools).
+fn sidebar(ui: &mut Ui, closing: bool, data: &Data, views: &mut Views, right: bool) {
+    let t = open_amount(ui, closing);
+    let kind = if right { Kind::Control } else { Kind::Dashboard };
+    ui.backdrop(Action::Close(kind));
+    ui.cr.save().ok();
+    ui.cr.push_group();
+    if right {
+        material::right_sidebar(ui, t, data, views);
+    } else {
+        material::left_sidebar(ui, t, data, views);
+    }
+    let _ = ui.cr.pop_group_to_source();
+    let _ = ui.cr.paint_with_alpha(t.clamp(0.0, 1.0));
+    ui.cr.restore().ok();
+}
+
 pub fn empty(ui: &mut Ui, r: Rect, icon: &str, msg: &str) {
     let (ic, rest) = Rect::new(r.x, r.cy() - 40.0, r.w, 80.0).take_top(40.0, 6.0);
     ui.icon(ic, icon, 32.0, Some(ui.th.pal.muted));

@@ -12,7 +12,7 @@ depends=('base-devel' 'jq' 'hyprland>=0.57' 'hyprlock' 'hypridle' 'xdg-desktop-p
          'grim' 'slurp' 'wl-clipboard' 'cliphist' 'libnotify' 'curl'
          'cairo' 'pango' 'python' 'python-gobject' 'gtk4' 'libadwaita'
          'inter-font' 'ttf-jetbrains-mono' 'noto-fonts' 'noto-fonts-emoji' 'papirus-icon-theme' 'adwaita-icon-theme' 'adw-gtk-theme'
-         'foot' 'starship' 'pacman-contrib' 'zram-generator' 'sassc')
+         'foot' 'starship' 'pacman-contrib' 'zram-generator' 'sassc' 'hyprpicker')
 optdepends=('hyprpolkitagent: password dialogs for apps'
             'hyprsunset: Night Light'
             'gamemode: Game Mode CPU governor'

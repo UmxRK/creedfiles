@@ -43,7 +43,7 @@ pub fn spec(th: &gfx::Theme, data: &Data, _ow: u32, _oh: u32) -> Spec {
         exclusive: 0,
         keyboard: KeyboardInteractivity::None,
         namespace: "creed-notifications",
-        click_through: false,
+        click_through: false, input: None,
     }
 }
 

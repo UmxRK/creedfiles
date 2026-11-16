@@ -310,11 +310,7 @@ impl App {
         let surface = self.compositor.create_surface(&self.qh);
         let layer = self.layer_shell.create_layer_surface(&self.qh, surface, spec.layer, Some(spec.namespace), output.as_ref());
         apply_spec(&layer, &spec);
-        if spec.click_through {
-            if let Ok(r) = Region::new(&self.compositor) {
-                layer.wl_surface().set_input_region(Some(r.wl_region()));
-            }
-        }
+        apply_input(&self.compositor, &layer, &spec);
         let fractional =
             self.fractional_mgr.as_ref().map(|m| m.get_fractional_scale(layer.wl_surface(), &self.qh, layer.wl_surface().id().protocol_id()));
         let viewport = if fractional.is_some() { self.viewporter.as_ref().map(|v| v.get_viewport(layer.wl_surface(), &self.qh, ())) } else { None };
@@ -435,6 +431,9 @@ impl App {
             let spec = views::spec(s.kind, &self.theme, &self.data, &self.views, ow, oh);
             if spec != s.spec {
                 apply_spec(&s.layer, &spec);
+                if spec.input != s.spec.input || spec.click_through != s.spec.click_through {
+                    apply_input(&self.compositor, &s.layer, &spec);
+                }
                 if spec.size != s.spec.size {
                     s.layer.commit();
                     s.configured = false;
@@ -961,6 +960,25 @@ impl App {
                 if let Some(a) = self.views.launcher_result(&self.data, i) {
                     self.perform(a);
                 }
+            }
+            Action::SideTab(i) => {
+                self.views.side_tab = i.min(1);
+                self.views.query.clear();
+                self.views.scroll = 0.0;
+                self.mark(Kind::Control);
+            }
+            Action::TodoAdd => {
+                views::todo::add(&self.views.query);
+                self.views.query.clear();
+                self.mark(Kind::Control);
+            }
+            Action::TodoToggle(i) => {
+                views::todo::toggle(i);
+                self.mark(Kind::Control);
+            }
+            Action::TodoDelete(i) => {
+                views::todo::delete(i);
+                self.mark(Kind::Control);
             }
             Action::Page(p) => {
                 self.views.set_page(p);
@@ -1551,6 +1569,22 @@ pub fn apply_spec(layer: &LayerSurface, spec: &Spec) {
     layer.set_margin(spec.margin.0, spec.margin.1, spec.margin.2, spec.margin.3);
     layer.set_keyboard_interactivity(spec.keyboard);
     layer.set_layer(spec.layer);
+}
+
+/// Input region: none for click-through surfaces, a rectangle when the spec asks for one.
+fn apply_input(comp: &CompositorState, layer: &LayerSurface, spec: &Spec) {
+    if spec.click_through {
+        if let Ok(r) = Region::new(comp) {
+            layer.wl_surface().set_input_region(Some(r.wl_region()));
+        }
+    } else if let Some((x, y, w, h)) = spec.input {
+        if let Ok(r) = Region::new(comp) {
+            r.add(x, y, w, h);
+            layer.wl_surface().set_input_region(Some(r.wl_region()));
+        }
+    } else {
+        layer.wl_surface().set_input_region(None);
+    }
 }
 
 pub fn hit_at(hits: &[Hit], x: f64, y: f64) -> Option<&Hit> {

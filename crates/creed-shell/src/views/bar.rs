@@ -16,9 +16,16 @@ pub fn spec(th: &gfx::Theme, _ow: u32, _oh: u32) -> Spec {
     let floating = b.style != BarStyle::Edge;
     let m = if floating { b.margin } else { 0 };
     let thick = b.size + m;
+    // Material bar: rounded screen corners hang below (or above) it; they take no input.
+    let corners = screen_corners(th);
+    let input = match (corners, b.position) {
+        (c, Edge::Top) if c > 0 => Some((0, 0, 1 << 20, thick as i32)),
+        (c, Edge::Bottom) if c > 0 => Some((0, c as i32, 1 << 20, thick as i32)),
+        _ => None,
+    };
     let (anchor, size) = match b.position {
-        Edge::Top => (Anchor::TOP | Anchor::LEFT | Anchor::RIGHT, (0, thick)),
-        Edge::Bottom => (Anchor::BOTTOM | Anchor::LEFT | Anchor::RIGHT, (0, thick)),
+        Edge::Top => (Anchor::TOP | Anchor::LEFT | Anchor::RIGHT, (0, thick + corners)),
+        Edge::Bottom => (Anchor::BOTTOM | Anchor::LEFT | Anchor::RIGHT, (0, thick + corners)),
         Edge::Left => (Anchor::LEFT | Anchor::TOP | Anchor::BOTTOM, (thick, 0)),
         Edge::Right => (Anchor::RIGHT | Anchor::TOP | Anchor::BOTTOM, (thick, 0)),
     };
@@ -31,11 +38,26 @@ pub fn spec(th: &gfx::Theme, _ow: u32, _oh: u32) -> Spec {
         keyboard: KeyboardInteractivity::None,
         namespace: "creed-bar",
         click_through: false,
+        input,
+    }
+}
+
+/// Radius of the rounded screen corners drawn under a flush Material bar (0 = none).
+pub fn screen_corners(th: &gfx::Theme) -> u32 {
+    let b = &th.cfg.bar;
+    if th.cfg.style.bar == "material" && b.style == BarStyle::Edge && matches!(b.position, Edge::Top | Edge::Bottom) {
+        th.cfg.style.radius.round().clamp(0.0, 40.0) as u32
+    } else {
+        0
     }
 }
 
 fn vertical(ui: &Ui) -> bool {
     matches!(ui.th.cfg.bar.position, Edge::Left | Edge::Right)
+}
+
+pub fn status_icons_pub(data: &Data) -> (String, String, Option<String>, Option<String>) {
+    status_icons(data)
 }
 
 fn status_icons(data: &Data) -> (String, String, Option<String>, Option<String>) {
@@ -97,7 +119,15 @@ fn module_len(ui: &mut Ui, name: &str, data: &Data, h: f64) -> f64 {
                 return l;
             }
         }
+        "material" => {
+            if let Some(l) = super::material::module_len(ui, name, data) {
+                return l;
+            }
+        }
         _ => {}
+    }
+    if matches!(name, "resources" | "utilities" | "status") {
+        return super::material::module_len(ui, name, data).unwrap_or(0.0);
     }
     let th = ui.th;
     let fs = th.fs;
@@ -282,7 +312,7 @@ pub fn draw(ui: &mut Ui, data: &Data, _views: &mut super::Views, cfg_err: Option
     let vert = vertical(ui);
     let full = match b.position {
         Edge::Top => Rect::new(m, m, sw - 2.0 * m, b.size as f64),
-        Edge::Bottom => Rect::new(m, 0.0, sw - 2.0 * m, b.size as f64),
+        Edge::Bottom => Rect::new(m, sh - m - b.size as f64, sw - 2.0 * m, b.size as f64),
         Edge::Left => Rect::new(m, m, b.size as f64, sh - 2.0 * m),
         Edge::Right => Rect::new(0.0, m, b.size as f64, sh - 2.0 * m),
     };
@@ -333,6 +363,7 @@ pub fn draw(ui: &mut Ui, data: &Data, _views: &mut super::Views, cfg_err: Option
         "win11" => super::win11::bar_background(ui, full),
         "win10" => super::win10::bar_background(ui, full),
         "mac" | "aqua" => super::mac::bar_background(ui, full),
+        "material" => super::material::bar_background(ui, full, screen_corners(th) as f64),
         _ => draw_creed_background(ui, full, radius, floating, &sect_rect, &lens),
     }
     fn draw_creed_background(ui: &mut Ui, full: Rect, radius: f64, floating: bool, sect_rect: &dyn Fn(usize) -> Rect, lens: &[f64]) {
@@ -408,7 +439,8 @@ fn draw_module(ui: &mut Ui, name: &str, r: Rect, data: &Data) {
         "win11" => super::win11::draw_module(ui, name, r, data),
         "win10" => super::win10::draw_module(ui, name, r, data),
         "mac" | "aqua" => super::mac::draw_module(ui, name, r, data),
-        _ => false,
+        "material" => super::material::draw_module(ui, name, r, data),
+        _ => matches!(name, "resources" | "utilities" | "status") && super::material::draw_module(ui, name, r, data),
     };
     if handled {
         return;
