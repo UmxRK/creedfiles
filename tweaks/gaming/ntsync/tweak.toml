@@ -5,6 +5,7 @@ reduces CPU overhead and stutter in many games. This loads the module now and at
 boot. Needs a kernel that ships the ntsync module (6.14 or newer).
 """
 touches = ["/etc/modules-load.d/creed-ntsync.conf"]
-recommend = "always"
+recommend = "ntsync"
+available = "ntsync"
 privileged = true
 risk = "low"

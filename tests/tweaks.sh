@@ -15,6 +15,7 @@ for toml in /src/tweaks/*/*/tweak.toml; do
   mkdir -p $R/sys/class/power_supply/BAT0 $R/sys/class/net/wlan0/wireless $R/sys/class/drm/card0/device $R/proc
   echo Battery > $R/sys/class/power_supply/BAT0/type; echo 0x10de > $R/sys/class/drm/card0/device/vendor
   printf 'processor\t: 0\nvendor_id\t: GenuineIntel\n' > $R/proc/cpuinfo
+  mkdir -p $R/proc/sys/kernel $R/lib/modules/6.18.1-test/kernel/drivers/misc; echo 6.18.1-test > $R/proc/sys/kernel/osrelease; touch $R/lib/modules/6.18.1-test/kernel/drivers/misc/ntsync.ko.zst
   echo "# original zram config" > $R/etc/systemd/zram-generator.conf
   before=$(cd $R && find . -type f -exec sha256sum {} + | sort; cd $H && find . -type f -exec sha256sum {} + | sort)
   priv=$(grep -c '^privileged = true' "$toml"); destr=$(grep -c '^destructive = true' "$toml")

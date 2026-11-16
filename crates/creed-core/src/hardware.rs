@@ -149,7 +149,11 @@ impl Hardware {
             has_ssd,
             has_hdd,
             kernel: read(r("/proc/sys/kernel/osrelease")),
-            ntsync: r("/dev/ntsync").exists(),
+            ntsync: r("/dev/ntsync").exists() || {
+                let k = read(r("/proc/sys/kernel/osrelease"));
+                let dir = r(&format!("/lib/modules/{k}/kernel/drivers/misc"));
+                !k.is_empty() && dir.read_dir().map(|mut it| it.any(|e| e.map(|e| e.file_name().to_string_lossy().starts_with("ntsync.ko")).unwrap_or(false))).unwrap_or(false)
+            },
         }
     }
 
@@ -276,7 +280,10 @@ mod tests {
         write(r, "sys/class/dmi/id/chassis_type", "3\n");
         write(r, "proc/mounts", "/dev/sda2 / ext4 rw 0 0\n");
         write(r, "sys/block/sda/queue/rotational", "1\n");
+        write(r, "proc/sys/kernel/osrelease", "6.18.1-arch1-1\n");
+        write(r, "lib/modules/6.18.1-arch1-1/kernel/drivers/misc/ntsync.ko.zst", "");
         let h = Hardware::detect_at(r);
+        assert!(h.ntsync && h.matches("ntsync"));
         assert!(!h.is_laptop && !h.is_hybrid() && !h.weak_gpu());
         assert!(h.matches("desktop,amd,cpu:amd,ram<8192,hdd,!btrfs,!wifi"));
     }
