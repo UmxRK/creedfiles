@@ -401,6 +401,14 @@ pub fn vars(paths: &Paths, cfg: &Config, pal: &Palette, hw: &Hardware, have: &dy
         },
     );
     put("lock.rounding", if mode == "win10" { "0".into() } else { "6".into() });
+    // Windows 10 sets the lock clock bottom-left; Windows 11 centres it near the top.
+    let win10 = mode == "win10";
+    put("lock.halign", if win10 { "left" } else { "center" }.into());
+    put("lock.valign", if win10 { "bottom" } else { "top" }.into());
+    put("lock.clock_pos", if win10 { "64, 170" } else { "0, -150" }.into());
+    put("lock.date_pos", if win10 { "70, 110" } else { "0, -300" }.into());
+    put("lock.clock_size", if win10 { "110" } else { "120" }.into());
+    put("lock.clock_weight", if win10 { "Light" } else { "Semibold" }.into());
     let wp = &cfg.appearance.wallpaper;
     let lock_wp = if wp.is_empty() || wp.starts_with("creed://") {
         paths.cache.join("lock-wallpaper.png").to_string_lossy().to_string()
@@ -489,6 +497,7 @@ pub fn procedural_seed(name: &str) -> Option<palette::Seed> {
         "dunes" => s(55.0, 30.0),
         "horizon" => s(260.0, 320.0),
         "tahoe" => s(255.0, 70.0),
+        "sequoia" => s(285.0, 340.0),
         "aurora" => s(290.0, 200.0),
         "aqua" => s(245.0, 220.0),
         _ => return None,

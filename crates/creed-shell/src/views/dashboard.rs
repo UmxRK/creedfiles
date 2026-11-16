@@ -13,6 +13,15 @@ pub fn draw(ui: &mut Ui, closing: bool, data: &Data, views: &mut Views) {
     ui.backdrop(Action::Close(Kind::Dashboard));
     let th = ui.th;
     let variant = th.cfg.style.dashboard.clone();
+    if variant == "aqua" {
+        ui.cr.save().ok();
+        ui.cr.push_group();
+        super::mac::aqua_dashboard(ui, t, data, views);
+        let _ = ui.cr.pop_group_to_source();
+        let _ = ui.cr.paint_with_alpha(t.clamp(0.0, 1.0));
+        ui.cr.restore().ok();
+        return;
+    }
     let (sw, sh) = ui.size;
     let bar = if th.cfg.bar.enabled { (th.cfg.bar.size + th.cfg.bar.margin) as f64 } else { 0.0 };
     let panel = match variant.as_str() {

@@ -165,7 +165,8 @@ pub fn draw(ui: &mut Ui, closing: bool, data: &Data, views: &mut Views) {
     match variant.as_str() {
         "start11" => super::win11::start(ui, t, data, views),
         "start10" => super::win10::start(ui, t, data, views),
-        "spotlight" | "aqua" => super::mac::spotlight(ui, t, data, views),
+        "aqua" => super::mac::aqua_spotlight(ui, t, data, views),
+        "spotlight" => super::mac::spotlight(ui, t, data, views),
         _ => draw_card(ui, t, data, views, &variant),
     }
     let _ = ui.cr.pop_group_to_source();

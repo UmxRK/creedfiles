@@ -7,6 +7,7 @@ use crate::ui::{self, Ui};
 use smithay_client_toolkit::shell::wlr_layer::{Anchor, KeyboardInteractivity, Layer};
 
 pub fn spec(th: &gfx::Theme, _ow: u32, _oh: u32) -> Spec {
+    let _oh = if _oh == 0 { 1080 } else { _oh };
     let bar = (th.cfg.bar.size + th.cfg.bar.margin) as i32;
     match th.cfg.style.osd.as_str() {
         "win11" => {
@@ -20,6 +21,11 @@ pub fn spec(th: &gfx::Theme, _ow: u32, _oh: u32) -> Spec {
         "material" => {
             let (w, h) = super::material::OSD_SIZE;
             return Spec { layer: Layer::Overlay, anchor: Anchor::TOP, size: (w, h), margin: (bar + 8, 0, 0, 0), exclusive: -1, keyboard: KeyboardInteractivity::None, namespace: "creed-osd", click_through: true, input: None };
+        }
+        "mac-hud" => {
+            // Big Sur → Ventura and Aqua: the square HUD in the lower middle of the screen.
+            let (w, h) = super::mac::HUD_SIZE;
+            return Spec { layer: Layer::Overlay, anchor: Anchor::BOTTOM, size: (w, h), margin: (0, 0, (_oh as f64 * 0.14) as i32, 0), exclusive: -1, keyboard: KeyboardInteractivity::None, namespace: "creed-osd", click_through: true, input: None };
         }
         "mac" => {
             let (w, h) = super::mac::OSD_SIZE;
@@ -46,13 +52,14 @@ pub fn draw(ui: &mut Ui, closing: bool, data: &Data) {
     let t = super::open_amount(ui, closing);
     let Some((kind, value, _)) = data.osd else { return };
     let variant = ui.th.cfg.style.osd.clone();
-    if matches!(variant.as_str(), "win11" | "win10" | "mac" | "material") {
+    if matches!(variant.as_str(), "win11" | "win10" | "mac" | "mac-hud" | "material") {
         ui.cr.save().ok();
         ui.cr.push_group();
         match variant.as_str() {
             "win11" => super::win11::osd(ui, kind, value),
             "win10" => super::win10::osd(ui, kind, value),
             "material" => super::material::osd(ui, kind, value),
+            "mac-hud" => super::mac::osd_hud(ui, kind, value),
             _ => super::mac::osd(ui, kind, value),
         }
         let _ = ui.cr.pop_group_to_source();

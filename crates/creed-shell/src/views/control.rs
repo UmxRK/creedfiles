@@ -17,6 +17,7 @@ pub fn draw(ui: &mut Ui, closing: bool, data: &Data, views: &mut Views) {
         match variant.as_str() {
             "win11" => super::win11::quick_settings(ui, t, data, views),
             "win10" => super::win10::action_center(ui, t, data, views),
+            "aqua" => super::mac::aqua_menu_extra(ui, t, data, views),
             _ => super::mac::control_center(ui, t, data, views),
         }
         let _ = ui.cr.pop_group_to_source();

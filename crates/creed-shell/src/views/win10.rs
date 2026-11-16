@@ -155,7 +155,9 @@ pub fn draw_module(ui: &mut Ui, name: &str, r: Rect, data: &Data) -> bool {
         }
         "keyboard" => {
             flat(ui, &t, r, key);
-            ui.text(r, &data.kb_layout.chars().take(3).collect::<String>().to_uppercase(), &Text::new(CAPTION, t.text1).center());
+            let (l1, l2) = super::win11::lang_lines(&data.kb_layout);
+            ui.text(Rect::new(r.x, r.y + 3.0, r.w, 17.0), &l1, &Text::new(CAPTION, t.text1).center());
+            ui.text(Rect::new(r.x, r.y + 20.0, r.w, 17.0), &l2, &Text::new(CAPTION, t.text1).center());
             ui.hit(key, r, Action::Hypr("hl.dsp.exec_cmd(\"hyprctl switchxkblayout all next\")".into()), Role::Button, "Input language");
         }
         "tray" => {
@@ -187,7 +189,8 @@ pub fn draw_module(ui: &mut Ui, name: &str, r: Rect, data: &Data) -> bool {
         }
         "notifications" => {
             flat(ui, &t, r, key);
-            let icon = if data.history.is_empty() { "notifications-symbolic" } else { "preferences-system-notifications-symbolic" };
+            // Windows 10's Action Center glyph: an empty speech bubble, or one with lines when there is news.
+            let icon = if data.history.is_empty() { "action-center-symbolic" } else { "action-center-new-symbolic" };
             ui.icon(r, icon, 16.0, Some(t.text1));
             if !data.history.is_empty() {
                 let n = data.history.len().min(9).to_string();
@@ -313,7 +316,9 @@ pub fn start(ui: &mut Ui, t_open: f64, data: &Data, views: &mut Views) {
     }
     // Live tiles: medium tiles 100×100, 4 px gutters, three per row.
     let tiles = Rect::new(list.right() + 24.0, panel.y + 12.0, panel.right() - list.right() - 36.0, panel.h - 24.0);
+    // Group headers as on a fresh Windows 10: "Productivity" (first two rows) and "Explore".
     ui.text(Rect::new(tiles.x, tiles.y, tiles.w, 32.0), "Productivity", &Text::new(CAPTION, t.text1));
+    ui.text(Rect::new(tiles.x, tiles.y + 36.0 + 2.0 * 104.0 + 4.0, tiles.w, 32.0), "Explore", &Text::new(CAPTION, t.text1));
     let mut pinned: Vec<&crate::data::AppEntry> = ui.th.cfg.dock.pinned.iter().filter_map(|p| data.apps.iter().find(|a| &a.id == p)).collect();
     for a in &data.apps {
         if pinned.len() >= 9 {
@@ -324,15 +329,19 @@ pub fn start(ui: &mut Ui, t_open: f64, data: &Data, views: &mut Views) {
         }
     }
     for (i, a) in pinned.iter().enumerate().take(9) {
-        let r = Rect::new(tiles.x + (i % 3) as f64 * 104.0, tiles.y + 36.0 + (i / 3) as f64 * 104.0, 100.0, 100.0);
+        let group_gap = if i >= 6 { 40.0 } else { 0.0 };
+        let r = Rect::new(tiles.x + (i % 3) as f64 * 104.0, tiles.y + 36.0 + (i / 3) as f64 * 104.0 + group_gap, 100.0, 100.0);
         let k = ui::idn("w10.tile", &a.id);
         let hv = ui.hover_amt(k);
-        gfx::fill_rounded(ui.cr, r, 0.0, t.accent);
+        // Theme-aware tiles (20H2+): a translucent plate in the menu's own tone, the app's
+        // colourful icon, a light border on hover.
+        let plate = if t.dark { Color::rgba(1.0, 1.0, 1.0, 0.09 + 0.06 * hv) } else { Color::rgba(0.0, 0.0, 0.0, 0.05 + 0.04 * hv) };
+        gfx::fill_rounded(ui.cr, r, 0.0, plate);
         if hv > 0.01 {
-            gfx::stroke_rounded(ui.cr, r, 0.0, 2.0, Color::rgba(1.0, 1.0, 1.0, 0.5 * hv));
+            gfx::stroke_rounded(ui.cr, r, 0.0, 2.0, if t.dark { Color::rgba(1.0, 1.0, 1.0, 0.45 * hv) } else { Color::rgba(0.0, 0.0, 0.0, 0.3 * hv) });
         }
-        ui.icon(Rect::new(r.x, r.y, r.w, r.h - 16.0), &a.icon, 32.0, None);
-        ui.text(Rect::new(r.x + 8.0, r.bottom() - 24.0, r.w - 16.0, 18.0), &a.name, &Text::new(CAPTION, Color::WHITE));
+        ui.icon(Rect::new(r.x, r.y + 4.0, r.w, r.h - 24.0), &a.icon, 40.0, None);
+        ui.text(Rect::new(r.x + 8.0, r.bottom() - 24.0, r.w - 16.0, 18.0), &a.name, &Text::new(CAPTION, t.text1));
         ui.hit(k, r, Action::Launch(a.id.clone()), Role::Button, a.name.clone());
     }
 }

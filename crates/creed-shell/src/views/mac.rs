@@ -390,8 +390,21 @@ pub fn draw_module(ui: &mut Ui, name: &str, r: Rect, data: &Data) -> bool {
             ui.hit(key, r, Action::Toggle(Kind::Control), Role::Button, "Control Center");
         }
         "search" => {
-            item_hover(ui, &mm, r, key);
-            glyph_search(ui.cr, (r.cx(), r.cy()), 15.0, col);
+            if mm.aqua {
+                // Tiger: a blue glossy tile with a white magnifier at the far right.
+                let b = Rect::centered(r.cx(), r.cy(), 20.0, 18.0);
+                let g = cairo::LinearGradient::new(0.0, b.y, 0.0, b.bottom());
+                g.add_color_stop_rgb(0.0, 0.45, 0.68, 0.98);
+                g.add_color_stop_rgb(0.5, 0.2, 0.45, 0.9);
+                g.add_color_stop_rgb(1.0, 0.25, 0.55, 0.96);
+                gfx::rounded(ui.cr, b, 4.0);
+                let _ = ui.cr.set_source(&g);
+                let _ = ui.cr.fill();
+                glyph_search(ui.cr, (r.cx(), r.cy()), 12.0, Color::WHITE);
+            } else {
+                item_hover(ui, &mm, r, key);
+                glyph_search(ui.cr, (r.cx(), r.cy()), 15.0, col);
+            }
             ui.hit(key, r, Action::Toggle(Kind::Launcher), Role::Button, "Spotlight");
         }
         "media" => {
@@ -948,6 +961,47 @@ pub fn notif_center(ui: &mut Ui, t_open: f64, data: &Data, views: &mut Views) {
 
 pub const OSD_SIZE: (u32, u32) = (300, 64);
 
+pub const HUD_SIZE: (u32, u32) = (200, 200);
+
+/// The square volume/brightness HUD of Big Sur → Ventura (vibrancy) and Aqua (dark smoke):
+/// a big glyph over a row of 16 segments.
+pub fn osd_hud(ui: &mut Ui, kind: crate::data::OsdKind, value: f64) {
+    let mm = m(ui);
+    let (w, h) = ui.size;
+    let r = Rect::new(0.0, 0.0, w, h);
+    let (bg, fg, off) = if mm.aqua {
+        (Color::rgba(0.0, 0.0, 0.0, 0.32), Color::rgba(1.0, 1.0, 1.0, 0.95), Color::rgba(1.0, 1.0, 1.0, 0.18))
+    } else if mm.dark {
+        (Color::rgba(0.17, 0.17, 0.17, 0.82), Color::rgba(1.0, 1.0, 1.0, 0.86), Color::rgba(1.0, 1.0, 1.0, 0.16))
+    } else {
+        (Color::rgba(0.94, 0.94, 0.94, 0.86), Color::rgba(0.0, 0.0, 0.0, 0.72), Color::rgba(0.0, 0.0, 0.0, 0.12))
+    };
+    gfx::fill_rounded(ui.cr, r, if mm.aqua { 22.0 } else { 18.0 }, bg);
+    if !mm.aqua {
+        gfx::stroke_rounded(ui.cr, r, 18.0, 1.0, mm.stroke);
+    }
+    let c = (r.cx(), r.y + 84.0);
+    let muted = value <= 0.0;
+    match kind {
+        crate::data::OsdKind::Brightness => glyph_sun(ui.cr, c, 62.0, fg),
+        crate::data::OsdKind::Mic => glyph_mic(ui.cr, c, 70.0, fg, muted),
+        crate::data::OsdKind::Game => ui.icon(Rect::centered(c.0, c.1, 80.0, 80.0), "input-gaming-symbolic", 64.0, Some(fg)),
+        crate::data::OsdKind::Volume => glyph_speaker(ui.cr, (c.0 - 6.0, c.1), 84.0, fg, value, muted),
+    }
+    if kind == crate::data::OsdKind::Game {
+        ui.text(Rect::new(r.x, r.bottom() - 46.0, r.w, 20.0), if value > 0.5 { "Game Mode On" } else { "Game Mode Off" }, &Text::new(13.0, fg).bold().center());
+        return;
+    }
+    let v = ui.spring(ui::id("mac.hud"), value.clamp(0.0, 1.0), value.clamp(0.0, 1.0));
+    let lit = (v * 16.0).round() as i32;
+    let (sw, gap) = (7.0, 2.0);
+    let x0 = r.cx() - (16.0 * sw + 15.0 * gap) / 2.0;
+    for i in 0..16 {
+        let seg = Rect::new(x0 + i as f64 * (sw + gap), r.bottom() - 38.0, sw, 7.0);
+        gfx::fill_rounded(ui.cr, seg, if mm.aqua { 0.5 } else { 1.5 }, if i < lit { fg } else { off });
+    }
+}
+
 pub fn osd(ui: &mut Ui, kind: crate::data::OsdKind, value: f64) {
     let mm = m(ui);
     let (w, h) = ui.size;
@@ -1118,4 +1172,377 @@ pub fn draw_app_menu(ui: &mut Ui, t_open: f64, data: &Data, x: f64) {
         }
         y += row;
     }
+}
+
+// ───────────────────────────── Aqua (10.4 Tiger) ─────────────────────────────
+// Before Control Center, Notification Center and the centred Spotlight: drop-down menus
+// from the menu bar, Tiger's Spotlight panel under the blue magnifier, Dashboard over a
+// dimmed screen, and Growl-style "smoke" bubbles.
+
+/// White Aqua drop-down: square top under the menu bar, rounded bottom corners, soft shadow.
+fn aqua_menu_bg(ui: &mut Ui, r: Rect) {
+    gfx::shadow(ui.cr, r, 5.0, 14.0, 6.0, 0.35);
+    let cr = ui.cr;
+    cr.new_path();
+    let rad = 5.0;
+    cr.move_to(r.x, r.y);
+    cr.line_to(r.right(), r.y);
+    cr.line_to(r.right(), r.bottom() - rad);
+    cr.arc(r.right() - rad, r.bottom() - rad, rad, 0.0, PI / 2.0);
+    cr.line_to(r.x + rad, r.bottom());
+    cr.arc(r.x + rad, r.bottom() - rad, rad, PI / 2.0, PI);
+    cr.close_path();
+    cr.set_source_rgba(1.0, 1.0, 1.0, 0.96);
+    let _ = cr.fill_preserve();
+    cr.set_source_rgba(0.0, 0.0, 0.0, 0.18);
+    cr.set_line_width(1.0);
+    let _ = cr.stroke();
+}
+
+/// Aqua's glossy blue selection.
+fn aqua_sel(ui: &mut Ui, r: Rect) {
+    let g = cairo::LinearGradient::new(0.0, r.y, 0.0, r.bottom());
+    g.add_color_stop_rgb(0.0, 0.42, 0.65, 0.97);
+    g.add_color_stop_rgb(0.5, 0.24, 0.48, 0.91);
+    g.add_color_stop_rgb(0.51, 0.16, 0.40, 0.87);
+    g.add_color_stop_rgb(1.0, 0.22, 0.50, 0.94);
+    ui.cr.rectangle(r.x, r.y, r.w, r.h);
+    let _ = ui.cr.set_source(&g);
+    let _ = ui.cr.fill();
+}
+
+/// Aqua slider: inset track, blue fill, glossy round knob. Registers a slider hit.
+fn aqua_slider(ui: &mut Ui, key: ui::Id, r: Rect, v: f64, which: Slider, label: &str) {
+    let v = v.clamp(0.0, 1.0);
+    let track = Rect::new(r.x + r.h / 2.0, r.cy() - 3.0, r.w - r.h, 6.0);
+    gfx::fill_rounded(ui.cr, track, 3.0, Color::rgba(0.0, 0.0, 0.0, 0.18));
+    gfx::fill_rounded(ui.cr, Rect::new(track.x, track.y, track.w * v, 6.0), 3.0, Color::rgba(0.22, 0.48, 0.92, 1.0));
+    let kx = track.x + track.w * v;
+    let k = Rect::centered(kx, r.cy(), 15.0, 15.0);
+    gfx::shadow(ui.cr, k, 7.5, 3.0, 1.0, 0.4);
+    let g = cairo::RadialGradient::new(kx - 2.0, r.cy() - 3.0, 1.0, kx, r.cy(), 8.0);
+    g.add_color_stop_rgb(0.0, 1.0, 1.0, 1.0);
+    g.add_color_stop_rgb(0.6, 0.55, 0.75, 0.98);
+    g.add_color_stop_rgb(1.0, 0.18, 0.42, 0.85);
+    gfx::rounded(ui.cr, k, 7.5);
+    let _ = ui.cr.set_source(&g);
+    let _ = ui.cr.fill();
+    if ui.focus == Some(key) {
+        ui.th.focus_ring(ui.cr, r, 4.0);
+    }
+    let hit = ui.hit(key, r, Action::Slider(which), Role::Slider, label);
+    hit.value = Some(v);
+}
+
+/// One menu row; returns its rect. `None` action = disabled (grey) row.
+fn aqua_row(ui: &mut Ui, key: ui::Id, r: Rect, label: &str, check: bool, action: Option<Action>) {
+    let enabled = action.is_some();
+    let hv = if enabled { ui.hover_amt(key) } else { 0.0 };
+    let sel = hv > 0.5 || (enabled && ui.focus == Some(key));
+    if sel {
+        aqua_sel(ui, r);
+    }
+    let fg = if !enabled { Color::rgba(0.0, 0.0, 0.0, 0.35) } else if sel { Color::WHITE } else { Color::BLACK };
+    if check {
+        ui.text(Rect::new(r.x + 6.0, r.y, 14.0, r.h), "✓", &Text::new(13.0, fg));
+    }
+    ui.text(Rect::new(r.x + 20.0, r.y, r.w - 30.0, r.h), label, &Text::new(13.0, fg));
+    if let Some(a) = action {
+        let hit = ui.hit(key, r, a, if check { Role::Toggle } else { Role::Item }, label);
+        if check {
+            hit.value = Some(1.0);
+        }
+    }
+}
+
+fn aqua_sep(ui: &mut Ui, x: f64, y: f64, w: f64) {
+    gfx::fill_rounded(ui.cr, Rect::new(x + 1.0, y + 5.0, w - 2.0, 1.0), 0.0, Color::rgba(0.0, 0.0, 0.0, 0.12));
+}
+
+fn aqua_right_drop(ui: &Ui, w: f64) -> Rect {
+    let (sw, _) = ui.size;
+    let bar = ui.th.cfg.bar.size as f64;
+    Rect::new((sw - w - 6.0).round(), bar, w, 0.0)
+}
+
+/// Tiger's Spotlight: a panel dropping from the blue magnifier at the right of the menu bar.
+pub fn aqua_spotlight(ui: &mut Ui, t_open: f64, data: &Data, views: &mut Views) {
+    let results = super::launcher::search(&data.apps, &views.query);
+    let special = super::launcher::special_label(&views.query);
+    let n = (results.len() + special.is_some() as usize).min(12);
+    let mut r = aqua_right_drop(ui, 340.0);
+    let rows_h = if views.query.is_empty() { 0.0 } else { (n.max(1) as f64) * 20.0 + 8.0 };
+    r.h = 38.0 + rows_h;
+    super::popup_transform(ui, r, t_open, true);
+    aqua_menu_bg(ui, r);
+    ui.record("launcher.panel", r, None);
+    ui.hit(ui::id("launcher.panel"), r, Action::None, Role::Group, "");
+    ui.text(Rect::new(r.x + 12.0, r.y + 8.0, 80.0, 22.0), "Spotlight", &Text::new(13.0, Color::BLACK).bold());
+    let field = Rect::new(r.x + 96.0, r.y + 8.0, r.w - 108.0, 22.0);
+    gfx::fill_rounded(ui.cr, field, 11.0, Color::WHITE);
+    gfx::stroke_rounded(ui.cr, field, 11.0, 1.0, Color::rgba(0.0, 0.0, 0.0, 0.45));
+    let ig = cairo::LinearGradient::new(0.0, field.y, 0.0, field.y + 5.0);
+    ig.add_color_stop_rgba(0.0, 0.0, 0.0, 0.0, 0.18);
+    ig.add_color_stop_rgba(1.0, 0.0, 0.0, 0.0, 0.0);
+    gfx::rounded(ui.cr, field.inset(1.0), 10.0);
+    let _ = ui.cr.set_source(&ig);
+    let _ = ui.cr.fill();
+    glyph_search(ui.cr, (field.x + 12.0, field.cy()), 11.0, Color::rgba(0.0, 0.0, 0.0, 0.55));
+    let q = format!("{}{}", views.query, views.preedit);
+    let tr = Rect::new(field.x + 22.0, field.y, field.w - 30.0, field.h);
+    let b = ui.text(tr, &q, &Text::new(12.0, Color::BLACK));
+    gfx::fill_rounded(ui.cr, Rect::new(if q.is_empty() { tr.x } else { b.right() + 1.0 }, field.y + 4.0, 1.2, field.h - 8.0), 0.0, Color::BLACK);
+    ui.hit(ui::id("launcher.input"), field, Action::None, Role::Input, "Spotlight");
+    if views.query.is_empty() {
+        return;
+    }
+    let mut y = r.y + 40.0;
+    if n == 0 {
+        ui.text(Rect::new(r.x, y, r.w, 20.0), "No Results", &Text::new(12.0, Color::rgba(0.0, 0.0, 0.0, 0.5)).center());
+        return;
+    }
+    for i in 0..n {
+        let row = Rect::new(r.x + 1.0, y, r.w - 2.0, 20.0);
+        let sel = views.sel == i;
+        let k = ui::idn("aqua.sp", i);
+        let hv = ui.hover_amt(k);
+        if sel || hv > 0.5 {
+            aqua_sel(ui, row);
+        }
+        let fg = if sel || hv > 0.5 { Color::WHITE } else { Color::BLACK };
+        // Category column on the left, like Tiger's results menu.
+        // Calculator result first (if any), then the top hit, then the other applications.
+        let top = special.is_some() as usize;
+        let cat = if special.is_some() && i == 0 { "Calculator" } else if i == top { "Top Hit" } else if i == top + 1 { "Applications" } else { "" };
+        ui.text(Rect::new(row.x, row.y, 86.0, row.h), cat, &Text::new(11.0, if sel || hv > 0.5 { Color::WHITE } else { Color::rgba(0.0, 0.0, 0.0, 0.5) }).end());
+        let (icon, title) = match (i, special.as_ref()) {
+            (0, Some((t, _, ic))) => (ic.to_string(), t.clone()),
+            _ => {
+                let a = &data.apps[results[i - special.is_some() as usize]];
+                (a.icon.clone(), a.name.clone())
+            }
+        };
+        ui.icon(Rect::new(row.x + 96.0, row.y, 16.0, row.h), &icon, 16.0, if icon.ends_with("-symbolic") { Some(fg) } else { None });
+        ui.text(Rect::new(row.x + 118.0, row.y, row.w - 126.0, row.h), &title, &Text::new(12.0, fg));
+        ui.hit(k, row, Action::LauncherPick(i), Role::Item, title);
+        y += 20.0;
+    }
+}
+
+/// Tiger menu extras: AirPort, Bluetooth, volume and brightness in one drop-down.
+pub fn aqua_menu_extra(ui: &mut Ui, t_open: f64, data: &Data, _views: &mut Views) {
+    let mut r = aqua_right_drop(ui, 250.0);
+    let wifi = data.net.wifi_enabled;
+    let bt = data.bt.as_ref().map(|b| b.powered);
+    let mut h = 6.0 + 20.0 * 2.0 + 11.0;
+    if bt.is_some() {
+        h += 40.0 + 11.0;
+    }
+    if data.audio.is_some() {
+        h += 20.0 + 26.0;
+    }
+    if data.brightness.is_some() {
+        h += 20.0 + 26.0;
+    }
+    h += 11.0 + 20.0 + 11.0 + 20.0 + 6.0;
+    r.h = h;
+    super::popup_transform(ui, r, t_open, true);
+    aqua_menu_bg(ui, r);
+    ui.record("control.panel", r, None);
+    ui.hit(ui::id("control.panel"), r, Action::None, Role::Group, "");
+    let mut y = r.y + 6.0;
+    let row = |y: f64| Rect::new(r.x + 1.0, y, r.w - 2.0, 20.0);
+    aqua_row(ui, ui::id("aq.ap.state"), row(y), if wifi { "AirPort: On" } else { "AirPort: Off" }, false, None);
+    y += 20.0;
+    aqua_row(ui, ui::id("aq.ap"), row(y), if wifi { "Turn AirPort Off" } else { "Turn AirPort On" }, false, Some(Action::ToggleWifi));
+    y += 20.0;
+    aqua_sep(ui, r.x, y, r.w);
+    y += 11.0;
+    if let Some(on) = bt {
+        aqua_row(ui, ui::id("aq.bt.state"), row(y), if on { "Bluetooth: On" } else { "Bluetooth: Off" }, false, None);
+        y += 20.0;
+        aqua_row(ui, ui::id("aq.bt"), row(y), if on { "Turn Bluetooth Off" } else { "Turn Bluetooth On" }, false, Some(Action::ToggleBluetooth));
+        y += 20.0;
+        aqua_sep(ui, r.x, y, r.w);
+        y += 11.0;
+    }
+    if let Some(a) = &data.audio {
+        aqua_row(ui, ui::id("aq.vol.l"), row(y), "Volume", false, None);
+        y += 20.0;
+        aqua_slider(ui, ui::id("aq.vol"), Rect::new(r.x + 20.0, y, r.w - 40.0, 22.0), if a.muted { 0.0 } else { a.volume }, Slider::Volume, &format!("Volume {:.0}%", a.volume * 100.0));
+        y += 26.0;
+    }
+    if let Some(b) = data.brightness {
+        aqua_row(ui, ui::id("aq.bri.l"), row(y), "Brightness", false, None);
+        y += 20.0;
+        aqua_slider(ui, ui::id("aq.bri"), Rect::new(r.x + 20.0, y, r.w - 40.0, 22.0), b, Slider::Brightness, &format!("Brightness {:.0}%", b * 100.0));
+        y += 26.0;
+    }
+    aqua_sep(ui, r.x, y, r.w);
+    y += 11.0;
+    aqua_row(ui, ui::id("aq.game"), row(y), "Game Mode", data.game, Some(Action::ToggleGame));
+    y += 20.0;
+    aqua_sep(ui, r.x, y, r.w);
+    y += 11.0;
+    aqua_row(ui, ui::id("aq.prefs"), row(y), "Open System Preferences…", false, Some(Action::Exec("creed-settings".into())));
+}
+
+/// Tiger's clock menu: the date, then the recent notifications and a way to clear them.
+pub fn aqua_clock_menu(ui: &mut Ui, t_open: f64, data: &Data, _views: &mut Views) {
+    let mut r = aqua_right_drop(ui, 300.0);
+    let items: Vec<&crate::data::Notif> = data.history.iter().rev().take(8).collect();
+    r.h = 6.0 + 20.0 + 11.0 + if items.is_empty() { 20.0 } else { items.len() as f64 * 20.0 } + 11.0 + 40.0 + 6.0;
+    super::popup_transform(ui, r, t_open, true);
+    aqua_menu_bg(ui, r);
+    ui.record("notif-center.panel", r, None);
+    ui.hit(ui::id("nc.panel"), r, Action::None, Role::Group, "");
+    let mut y = r.y + 6.0;
+    let row = |y: f64| Rect::new(r.x + 1.0, y, r.w - 2.0, 20.0);
+    aqua_row(ui, ui::id("aq.date"), row(y), &time::format(time::now_secs(), "%A, %-d %B %Y"), false, None);
+    y += 20.0;
+    aqua_sep(ui, r.x, y, r.w);
+    y += 11.0;
+    if items.is_empty() {
+        aqua_row(ui, ui::id("aq.none"), row(y), "No Recent Notifications", false, None);
+        y += 20.0;
+    }
+    for n in items {
+        let label = format!("{} - {}", n.app, super::notif::strip_markup(&n.summary));
+        aqua_row(ui, ui::idn("aq.n", n.id), row(y), &label, false, Some(Action::NotifDismiss(n.id)));
+        y += 20.0;
+    }
+    aqua_sep(ui, r.x, y, r.w);
+    y += 11.0;
+    aqua_row(ui, ui::id("aq.clear"), row(y), "Clear History", false, Some(Action::NotifClear));
+    y += 20.0;
+    aqua_row(ui, ui::id("aq.dt"), row(y), "Open Date & Time…", false, Some(Action::Exec("creed-settings --page desktop".into())));
+}
+
+/// Growl "Smoke": a dark translucent rounded bubble with white text, top-right.
+pub fn growl_height(n: &crate::data::Notif) -> f64 {
+    let lines = if n.body.is_empty() { 0.0 } else { ((n.body.chars().count() as f64) / 40.0).ceil().clamp(1.0, 3.0) };
+    (12.0 + 17.0 + lines * 15.0 + 12.0).max(56.0).round()
+}
+
+pub fn growl(ui: &mut Ui, data: &Data) {
+    let (sw, _) = ui.size;
+    let mut y = 8.0;
+    for n in &data.notifs {
+        let h = growl_height(n);
+        let r = Rect::new(sw - 300.0 - 12.0, y, 300.0, h);
+        let k = ui::idn("growl", n.id);
+        let t = ui.spring(ui::idn("growl.in", n.id), 1.0, 0.0);
+        ui.cr.save().ok();
+        ui.cr.push_group();
+        gfx::fill_rounded(ui.cr, r, 10.0, Color::rgba(0.0, 0.0, 0.0, 0.72));
+        let icon = if n.icon.is_empty() { "dialog-information-symbolic".to_string() } else { n.icon.clone() };
+        ui.icon(Rect::new(r.x + 10.0, r.y + 10.0, 32.0, 32.0), &icon, 32.0, if icon.ends_with("-symbolic") { Some(Color::WHITE) } else { None });
+        ui.text(Rect::new(r.x + 52.0, r.y + 10.0, r.w - 62.0, 17.0), &super::notif::strip_markup(&n.summary), &Text::new(13.0, Color::WHITE).bold());
+        if !n.body.is_empty() {
+            ui.text(Rect::new(r.x + 52.0, r.y + 28.0, r.w - 62.0, h - 36.0), &super::notif::strip_markup(&n.body), &Text::new(12.0, Color::rgba(1.0, 1.0, 1.0, 0.9)).lines(3));
+        }
+        let _ = ui.cr.pop_group_to_source();
+        let _ = ui.cr.paint_with_alpha(t.clamp(0.0, 1.0));
+        ui.cr.restore().ok();
+        ui.record(&format!("notif.{}", n.id), r, None);
+        ui.hit(k, r, Action::NotifDismiss(n.id), Role::Item, format!("{}: {}", n.app, n.summary));
+        y += h + 8.0;
+    }
+}
+
+/// Tiger's Dashboard: the screen dims and the widgets float over it.
+pub fn aqua_dashboard(ui: &mut Ui, t_open: f64, data: &Data, views: &mut Views) {
+    let (sw, sh) = ui.size;
+    ui.cr.rectangle(0.0, 0.0, sw, sh);
+    ui.cr.set_source_rgba(0.0, 0.0, 0.0, 0.45 * t_open.clamp(0.0, 1.0));
+    let _ = ui.cr.fill();
+    let scale = 0.92 + 0.08 * t_open.clamp(0.0, 1.0);
+    ui.cr.save().ok();
+    ui.cr.translate(sw / 2.0, sh / 2.0);
+    ui.cr.scale(scale, scale);
+    ui.cr.translate(-sw / 2.0, -sh / 2.0);
+    let cx = sw / 2.0;
+    let cy = sh * 0.42;
+    // Clock: a black glossy face.
+    let cc = (cx - 260.0, cy);
+    let face = Rect::centered(cc.0, cc.1, 150.0, 150.0);
+    gfx::shadow(ui.cr, face, 75.0, 12.0, 6.0, 0.5);
+    gfx::fill_rounded(ui.cr, face, 75.0, Color::rgba(0.08, 0.08, 0.1, 1.0));
+    gfx::fill_rounded(ui.cr, face.inset(8.0), 67.0, Color::WHITE);
+    let now = time::local(time::now_secs());
+    for i in 0..12 {
+        let a = i as f64 / 12.0 * 2.0 * PI;
+        let (s, c) = a.sin_cos();
+        ui.cr.move_to(cc.0 + s * 54.0, cc.1 - c * 54.0);
+        ui.cr.line_to(cc.0 + s * 62.0, cc.1 - c * 62.0);
+    }
+    ui.cr.set_source_rgba(0.0, 0.0, 0.0, 0.8);
+    ui.cr.set_line_width(2.0);
+    let _ = ui.cr.stroke();
+    let hand = |ui: &mut Ui, frac: f64, len: f64, wdt: f64, col: Color| {
+        let a = frac * 2.0 * PI;
+        ui.cr.move_to(cc.0, cc.1);
+        ui.cr.line_to(cc.0 + a.sin() * len, cc.1 - a.cos() * len);
+        ui.cr.set_line_width(wdt);
+        ui.cr.set_line_cap(cairo::LineCap::Round);
+        gfx::set(ui.cr, col);
+        let _ = ui.cr.stroke();
+    };
+    hand(ui, (now.hour % 12) as f64 / 12.0 + now.min as f64 / 720.0, 34.0, 4.0, Color::BLACK);
+    hand(ui, now.min as f64 / 60.0, 50.0, 3.0, Color::BLACK);
+    let place = data.weather.as_ref().map(|w| w.place.clone()).unwrap_or_default();
+    ui.text(Rect::new(face.x, face.bottom() + 6.0, face.w, 18.0), if place.is_empty() { "Local Time" } else { &place }, &Text::new(12.0, Color::WHITE).bold().center());
+    // Calendar: a page with the month across a red band.
+    let cal = Rect::centered(cx, cy, 150.0, 150.0);
+    gfx::shadow(ui.cr, cal, 10.0, 12.0, 6.0, 0.5);
+    gfx::fill_rounded(ui.cr, cal, 10.0, Color::WHITE);
+    ui.cr.save().ok();
+    gfx::rounded(ui.cr, cal, 10.0);
+    ui.cr.clip();
+    let band = cairo::LinearGradient::new(0.0, cal.y, 0.0, cal.y + 34.0);
+    band.add_color_stop_rgb(0.0, 0.9, 0.25, 0.22);
+    band.add_color_stop_rgb(1.0, 0.68, 0.1, 0.1);
+    ui.cr.rectangle(cal.x, cal.y, cal.w, 34.0);
+    let _ = ui.cr.set_source(&band);
+    let _ = ui.cr.fill();
+    ui.cr.restore().ok();
+    ui.text(Rect::new(cal.x, cal.y, cal.w, 34.0), &time::format(time::now_secs(), "%B"), &Text::new(15.0, Color::WHITE).bold().center());
+    ui.text(Rect::new(cal.x, cal.y + 38.0, cal.w, 76.0), &now.day.to_string(), &Text::new(64.0, Color::BLACK).bold().center());
+    ui.text(Rect::new(cal.x, cal.bottom() - 30.0, cal.w, 20.0), &time::format(time::now_secs(), "%A"), &Text::new(13.0, Color::rgba(0.0, 0.0, 0.0, 0.6)).center());
+    ui.hit(ui::id("aq.dash.cal"), cal, Action::Toggle(Kind::Calendar), Role::Button, format!("Calendar, {}", time::format(time::now_secs(), "%A %-d %B")));
+    // Weather: the blue glossy box.
+    let wr = Rect::new(cx + 110.0, cy - 70.0, 300.0, 140.0);
+    gfx::shadow(ui.cr, wr, 14.0, 12.0, 6.0, 0.5);
+    let wg = cairo::LinearGradient::new(0.0, wr.y, 0.0, wr.bottom());
+    wg.add_color_stop_rgb(0.0, 0.33, 0.6, 0.95);
+    wg.add_color_stop_rgb(1.0, 0.1, 0.32, 0.72);
+    gfx::rounded(ui.cr, wr, 14.0);
+    let _ = ui.cr.set_source(&wg);
+    let _ = ui.cr.fill();
+    let gl = cairo::LinearGradient::new(0.0, wr.y, 0.0, wr.cy());
+    gl.add_color_stop_rgba(0.0, 1.0, 1.0, 1.0, 0.35);
+    gl.add_color_stop_rgba(1.0, 1.0, 1.0, 1.0, 0.0);
+    gfx::rounded(ui.cr, Rect::new(wr.x + 2.0, wr.y + 2.0, wr.w - 4.0, wr.h / 2.0), 12.0);
+    let _ = ui.cr.set_source(&gl);
+    let _ = ui.cr.fill();
+    match &data.weather {
+        Some(w) => {
+            ui.icon(Rect::new(wr.x + 16.0, wr.y + 20.0, 64.0, 64.0), &w.icon, 56.0, Some(Color::WHITE));
+            ui.text(Rect::new(wr.x + 96.0, wr.y + 16.0, wr.w - 110.0, 60.0), &w.temp, &Text::new(48.0, Color::WHITE).bold().end());
+            ui.text(Rect::new(wr.x + 16.0, wr.bottom() - 46.0, wr.w - 32.0, 18.0), &w.place, &Text::new(13.0, Color::WHITE).bold());
+            ui.text(Rect::new(wr.x + 16.0, wr.bottom() - 26.0, wr.w - 32.0, 18.0), &format!("{} · {}", w.desc, w.hi_lo), &Text::new(12.0, Color::rgba(1.0, 1.0, 1.0, 0.9)));
+        }
+        None => {
+            ui.text(wr, "Weather unavailable", &Text::new(14.0, Color::WHITE).bold().center());
+        }
+    }
+    ui.hit(ui::id("aq.dash.w"), wr, Action::None, Role::Label, "Weather");
+    ui.cr.restore().ok();
+    // The round "+" button bottom-left opens the widget settings.
+    let plus = Rect::new(18.0, sh - 54.0, 36.0, 36.0);
+    gfx::fill_rounded(ui.cr, plus, 18.0, Color::rgba(1.0, 1.0, 1.0, 0.25));
+    gfx::stroke_rounded(ui.cr, plus, 18.0, 1.5, Color::rgba(1.0, 1.0, 1.0, 0.8));
+    ui.text(plus, "+", &Text::new(24.0, Color::WHITE).bold().center());
+    ui.hit(ui::id("aq.dash.plus"), plus, Action::Exec("creed-settings --page desktop".into()), Role::Button, "Widget settings");
+    let _ = views;
 }

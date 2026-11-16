@@ -25,6 +25,7 @@ pub fn spec(th: &gfx::Theme, data: &Data, _ow: u32, _oh: u32) -> Spec {
         "win11" => (364.0 + 24.0, data.notifs.iter().map(|n| super::win11::toast_height(n) + 12.0).sum::<f64>() + 12.0),
         "win10" => (364.0 + 24.0, data.notifs.iter().map(|n| super::win10::toast_height(n) + 12.0).sum::<f64>() + 12.0),
         "mac" => (344.0 + 24.0, data.notifs.iter().map(|n| super::mac::banner_height(n) + 10.0).sum::<f64>() + 12.0),
+        "growl" => (300.0 + 24.0, data.notifs.iter().map(|n| super::mac::growl_height(n) + 8.0).sum::<f64>() + 12.0),
         _ => (W + 24.0, data.notifs.iter().map(|n| card_height(th, n) + GAP).sum::<f64>() + 16.0),
     };
     let corner = th.cfg.notifications.position;
@@ -140,6 +141,7 @@ pub fn draw_popups(ui: &mut Ui, data: &Data) {
         "win11" => return super::win11::toasts(ui, data),
         "win10" => return super::win10::toasts(ui, data),
         "mac" => return super::mac::banners(ui, data),
+        "growl" => return super::mac::growl(ui, data),
         _ => {}
     }
     let th = ui.th;
@@ -171,12 +173,13 @@ pub fn draw_center(ui: &mut Ui, closing: bool, data: &Data, views: &mut Views) {
     let t = open_amount(ui, closing);
     ui.backdrop(Action::Close(Kind::NotifCenter));
     let v = ui.th.cfg.style.notifications.clone();
-    if matches!(v.as_str(), "win11" | "win10" | "mac") {
+    if matches!(v.as_str(), "win11" | "win10" | "mac" | "growl") {
         ui.cr.save().ok();
         ui.cr.push_group();
         match v.as_str() {
             "win11" => super::win11::notif_center(ui, t, data, views),
             "win10" => super::win10::action_center(ui, t, data, views),
+            "growl" => super::mac::aqua_clock_menu(ui, t, data, views),
             _ => super::mac::notif_center(ui, t, data, views),
         }
         let _ = ui.cr.pop_group_to_source();

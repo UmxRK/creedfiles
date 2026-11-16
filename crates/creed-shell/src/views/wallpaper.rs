@@ -15,6 +15,7 @@ pub const PROCEDURAL: &[(&str, &str)] = &[
     ("dunes", "Dunes - layered desert hills"),
     ("horizon", "Horizon - liquid colour waves"),
     ("tahoe", "Tahoe - blue wave under a warm sky"),
+    ("sequoia", "Sequoia - sunrise sheets of violet and coral"),
     ("aurora", "Aurora - colourful curves"),
     ("aqua", "Aqua - glossy blue swirl"),
 ];
@@ -29,6 +30,7 @@ pub fn procedural_seed(name: &str) -> Option<Seed> {
         "dunes" => s(55.0, 30.0),
         "horizon" => s(260.0, 320.0),
         "tahoe" => s(255.0, 70.0),
+        "sequoia" => s(285.0, 340.0),
         "aurora" => s(290.0, 200.0),
         "aqua" => s(245.0, 220.0),
         _ => return None,
@@ -164,6 +166,63 @@ fn draw_bloom(cr: &Context, w: f64, h: f64, dark: bool) {
     blob(cr, cx, cy - m * 0.02, m * 0.09, c("#9cc8ff66"));
 }
 
+/// macOS 15-style: luminous sheets of violet, magenta and coral sweeping up from the bottom
+/// under a deep indigo sky (or a pale dawn sky in light mode), each with a soft lit edge.
+fn draw_sequoia(cr: &Context, w: f64, h: f64, dark: bool) {
+    let sky: [(f64, &str); 3] = if dark { [(0.0, "#0a0f2e"), (0.55, "#1a1650"), (1.0, "#2b1650")] } else { [(0.0, "#9fb8ea"), (0.55, "#c9b8e6"), (1.0, "#efc3c9")] };
+    vgrad(cr, w, h, &[(sky[0].0, c(sky[0].1)), (sky[1].0, c(sky[1].1)), (sky[2].0, c(sky[2].1))]);
+    blob(cr, w * 0.7, h * 0.35, w * 0.45, if dark { c("#3a2a8a66") } else { c("#ffffff55") });
+    // (base height, amplitude, phase, colour from, colour to, edge light)
+    let sheets: [(f64, f64, f64, &str, &str); 5] = if dark {
+        [(0.42, 0.16, 0.2, "#3b2db8", "#1b1a6b"), (0.52, 0.14, 1.3, "#6a2fc4", "#2a1a78"), (0.62, 0.12, 2.4, "#b0329e", "#4a1a70"), (0.72, 0.10, 3.1, "#ff5f6d", "#8a1f5a"), (0.84, 0.08, 4.0, "#ff9a5a", "#b8325a")]
+    } else {
+        [(0.42, 0.16, 0.2, "#7a8cf0", "#5560d8"), (0.52, 0.14, 1.3, "#9a6cf0", "#6a48d0"), (0.62, 0.12, 2.4, "#e06ac0", "#a048b0"), (0.72, 0.10, 3.1, "#ff7f86", "#e0507a"), (0.84, 0.08, 4.0, "#ffb27a", "#ff7a6a")]
+    };
+    for (y0, amp, ph, a, b) in sheets {
+        let path = |cr: &Context| {
+            cr.new_path();
+            cr.move_to(0.0, h);
+            let steps = 120;
+            for i in 0..=steps {
+                let x = w * i as f64 / steps as f64;
+                let t = x / w;
+                let y = h * (y0 - amp * (std::f64::consts::PI * t * 1.15 + ph).sin() * (0.6 + 0.4 * t) + 0.06 * (t * 5.0 + ph).sin() * amp);
+                cr.line_to(x, y);
+            }
+            cr.line_to(w, h);
+            cr.close_path();
+        };
+        path(cr);
+        // Lit crest fading into a deeper base gives each sheet its soft, fabric-like depth.
+        let g = LinearGradient::new(0.0, h * (y0 - amp), 0.0, h * (y0 + 0.22));
+        let (ca, cb) = (c(a), c(b));
+        let lift = |k: f64| (k + (1.0 - k) * 0.25).min(1.0);
+        g.add_color_stop_rgba(0.0, lift(ca.r), lift(ca.g), lift(ca.b), 0.95);
+        g.add_color_stop_rgba(0.35, ca.r, ca.g, ca.b, 0.95);
+        g.add_color_stop_rgba(1.0, cb.r, cb.g, cb.b, 0.97);
+        let _ = cr.set_source(&g);
+        let _ = cr.fill();
+        // Soft glow above the crest.
+        cr.save().ok();
+        path(cr);
+        cr.clip();
+        blob(cr, w * (0.3 + 0.2 * (ph % 1.0)), h * (y0 - amp * 0.6), w * 0.35, ca.with_alpha(0.22));
+        cr.restore().ok();
+        // Lit top edge of the sheet.
+        cr.new_path();
+        let steps = 120;
+        for i in 0..=steps {
+            let x = w * i as f64 / steps as f64;
+            let t = x / w;
+            let y = h * (y0 - amp * (std::f64::consts::PI * t * 1.15 + ph).sin() * (0.6 + 0.4 * t) + 0.06 * (t * 5.0 + ph).sin() * amp);
+            if i == 0 { cr.move_to(x, y) } else { cr.line_to(x, y) }
+        }
+        cr.set_line_width(w * 0.0015);
+        cr.set_source_rgba(1.0, 0.85, 0.9, if dark { 0.35 } else { 0.55 });
+        let _ = cr.stroke();
+    }
+}
+
 /// macOS 26-style wave: a pale sky (blue fading to warm cream) cut by a sweeping S-curve of deep
 /// blue glass with a bright, glossy edge line; a cool night variant for dark mode.
 fn draw_tahoe(cr: &Context, w: f64, h: f64, dark: bool) {
@@ -239,6 +298,7 @@ fn draw_procedural_inner(cr: &Context, name: &str, w: f64, h: f64, dark: bool) {
         }
         "bloom" => draw_bloom(cr, w, h, dark),
         "tahoe" => draw_tahoe(cr, w, h, dark),
+        "sequoia" => draw_sequoia(cr, w, h, dark),
         "ribbon" => {
             vgrad(cr, w, h, &[(0.0, c("#03122b")), (1.0, c("#06244f"))]);
             for (i, alpha) in [(0, 0.55), (1, 0.4), (2, 0.28)] {
