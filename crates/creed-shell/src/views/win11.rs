@@ -277,7 +277,7 @@ pub fn draw_module(ui: &mut Ui, name: &str, r: Rect, data: &Data) -> bool {
                 let b = btn(c);
                 let k = ui::idn("w11.task", id);
                 let hv = ui.hover_amt(k);
-                let active = wins.iter().any(|a| *a == data.active_addr);
+                let active = wins.contains(&data.active_addr);
                 if active {
                     gfx::fill_rounded(ui.cr, b, CONTROL_RADIUS, t.ctl_fill2);
                     gfx::stroke_rounded(ui.cr, b, CONTROL_RADIUS, 1.0, t.ctl_stroke);
@@ -670,7 +670,7 @@ pub fn toast_card(ui: &mut Ui, t: &Tok, r: Rect, n: &crate::data::Notif, in_cent
         let body = super::notif::strip_markup(&n.body);
         ui.text(Rect::new(content.x, content.y + 22.0, content.w, 60.0), &body, &Text::new(BODY, t.text2).lines(3));
     }
-    let default = n.actions.iter().find(|(k, _)| k == "default").map(|(k, _)| Action::NotifAction(n.id, k.clone())).unwrap_or(Action::NotifDismiss(n.id));
+    let default = n.actions.iter().find(|(k, _)| k == "default").map(|(k, _)| Action::NotifInvoke(n.id, k.clone())).unwrap_or(Action::NotifDismiss(n.id));
     ui.hit(k, r, default, Role::Item, format!("Notification from {}: {}", n.app, n.summary));
     if hv > 0.05 {
         ui.hit(ui::idn("w11.toast.x", n.id), close, Action::NotifDismiss(n.id), Role::Button, "Dismiss");
@@ -684,7 +684,7 @@ pub fn toast_card(ui: &mut Ui, t: &Tok, r: Rect, n: &crate::data::Notif, in_cent
             let ahv = ui.hover_amt(ak);
             fluent::button(ui.cr, t, cols[i], ahv, ui.is_pressed(ak), false);
             ui.text(cols[i], label, &Text::new(BODY, t.text1).center());
-            ui.hit(ak, cols[i], Action::NotifAction(n.id, key.clone()), Role::Button, label.clone());
+            ui.hit(ak, cols[i], Action::NotifInvoke(n.id, key.clone()), Role::Button, label.clone());
         }
     }
 }

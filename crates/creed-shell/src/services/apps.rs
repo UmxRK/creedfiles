@@ -122,7 +122,7 @@ pub fn scan() -> Vec<AppEntry> {
         }
     }
     *WM_CLASSES.lock().unwrap() = classes;
-    apps.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
+    apps.sort_by_key(|a| a.name.to_lowercase());
     apps
 }
 
@@ -159,7 +159,7 @@ pub fn parse_recent(xml: &str, now: i64) -> Vec<(String, String, String)> {
         }
         items.push((path, name, ts));
     }
-    items.sort_by(|a, b| b.2.cmp(&a.2));
+    items.sort_by_key(|x| std::cmp::Reverse(x.2));
     items.dedup_by(|a, b| a.0 == b.0);
     items
         .into_iter()
@@ -223,10 +223,7 @@ pub fn clean_exec(exec: &str) -> String {
     let mut chars = exec.chars().peekable();
     while let Some(c) = chars.next() {
         if c == '%' {
-            match chars.next() {
-                Some('%') => out.push('%'),
-                _ => {}
-            }
+            if let Some('%') = chars.next() { out.push('%') }
         } else {
             out.push(c);
         }

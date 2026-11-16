@@ -7,19 +7,6 @@ use cairo::{Context, LinearGradient, RadialGradient};
 use creed_core::palette::Seed;
 use creed_core::{Color, Paths};
 
-pub const PROCEDURAL: &[(&str, &str)] = &[
-    ("dawn", "Creed Dawn - warm drifting light"),
-    ("dusk", "Creed Dusk - violet evening haze"),
-    ("bloom", "Bloom - soft folded petals"),
-    ("ribbon", "Ribbon - beams of light in blue"),
-    ("dunes", "Dunes - layered desert hills"),
-    ("horizon", "Horizon - liquid colour waves"),
-    ("tahoe", "Tahoe - blue wave under a warm sky"),
-    ("sequoia", "Sequoia - sunrise sheets of violet and coral"),
-    ("aurora", "Aurora - colourful curves"),
-    ("aqua", "Aqua - glossy blue swirl"),
-];
-
 pub fn procedural_seed(name: &str) -> Option<Seed> {
     let s = |hue: f64, alt: f64| Seed { hue, alt_hue: alt, tint: 1.0, accent_chroma: 0.12, fixed_accent: None };
     Some(match name {

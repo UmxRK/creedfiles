@@ -402,7 +402,7 @@ impl Palette {
     pub fn vars(&self) -> BTreeMap<String, String> {
         let mut m = BTreeMap::new();
         let mut put = |k: String, c: Color| {
-            m.insert(format!("{k}"), c.to_hex());
+            m.insert(k.to_string(), c.to_hex());
             m.insert(format!("{k}.bare"), c.to_hex_bare());
             m.insert(format!("{k}.hypr"), c.to_hypr());
             m.insert(format!("{k}.css"), c.to_css());
@@ -435,7 +435,7 @@ mod tests {
     fn dominant_hue_from_pixels() {
         let orange = Color::parse("#e07a2f").unwrap();
         let (_, _, oh) = orange.to_oklch();
-        let px = std::iter::repeat((0xe0, 0x7a, 0x2f)).take(900).chain(std::iter::repeat((0x20, 0x40, 0xa0)).take(100));
+        let px = std::iter::repeat_n((0xe0, 0x7a, 0x2f), 900).chain(std::iter::repeat_n((0x20, 0x40, 0xa0), 100));
         let s = seed_from_pixels(px);
         assert!(hue_dist(s.hue, oh) <= 20.0, "hue {} vs {}", s.hue, oh);
         let p = Palette::generate(s, Scheme::Dark, false, None);
@@ -445,7 +445,7 @@ mod tests {
 
     #[test]
     fn greyscale_is_neutralish() {
-        let s = seed_from_pixels(std::iter::repeat((128, 128, 128)).take(100));
+        let s = seed_from_pixels(std::iter::repeat_n((128, 128, 128), 100));
         assert!(s.tint < 0.5);
     }
 

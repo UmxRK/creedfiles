@@ -170,7 +170,7 @@ pub fn draw(ui: &mut Ui, data: &Data, views: &mut Views) {
             ui.hit(k, r, if target == Kind::Overview { Action::Exec("creed toggle launchpad".into()) } else { Action::Toggle(target) }, Role::Button, "Applications");
         } else {
             ui.icon(dr, ic, dr.w.round(), None);
-            let active = wins.iter().any(|a| *a == data.active_addr);
+            let active = wins.contains(&data.active_addr);
             if !wins.is_empty() {
                 let dot = (icon * 0.09).round().max(4.0);
                 let len = if variant == "creed" && active { dot * 2.6 } else { dot };

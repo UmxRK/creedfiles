@@ -158,7 +158,7 @@ pub fn run_root(args: &[String]) -> Result<(), String> {
     let home = std::env::var_os("CREED_USER_HOME").map(PathBuf::from).unwrap_or_else(|| PathBuf::from("/root"));
     match action {
         "apply" => {
-            if hw.has_snapper && !t.def.destructive && root == PathBuf::from("/") {
+            if hw.has_snapper && !t.def.destructive && root == *"/" {
                 let _ = Command::new("snapper").args(["-c", "root", "create", "-c", "number", "-d", &format!("creed: before {id}")]).status();
             }
             print!("{}", eng.apply(&t, &hw, &home, confirm)?);

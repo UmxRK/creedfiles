@@ -581,7 +581,6 @@ impl App {
                 dt,
                 animating: false,
                 size: (w as f64, h as f64),
-                now: self.started.elapsed().as_secs_f64(),
             };
             let closing = s.closing;
             views::draw(&mut ui, s.kind, closing, &self.data, &mut self.views, &self.paths, self.config_error.as_deref());
@@ -686,7 +685,6 @@ impl App {
             Slider::Volume => services::audio::set_volume(v, false),
             Slider::Mic => services::audio::set_volume(v, true),
             Slider::Brightness => services::power::set_brightness(v),
-            Slider::Glass(_) => {}
         }
     }
 
@@ -707,7 +705,6 @@ impl App {
                     }
                 }
                 Slider::Brightness => self.data.brightness = Some(frac),
-                Slider::Glass(_) => {}
             }
             self.mark_all();
         }
@@ -876,7 +873,6 @@ impl App {
                 self.open(k)
             }
             Action::Close(k) => self.close(k),
-            Action::CloseAll => self.close_popups(),
             Action::Exec(cmd) => {
                 services::spawn_shell(&cmd);
                 self.close_popups();
@@ -951,7 +947,7 @@ impl App {
                 self.respec(Kind::Notifications);
                 self.mark_all();
             }
-            Action::NotifAction(id, key) => {
+            Action::NotifInvoke(id, key) => {
                 if let Some(b) = &self.notif_bus {
                     b.action(id, &key);
                     b.closed(id, 2);
@@ -1080,10 +1076,6 @@ impl App {
             Action::Calendar(d) => {
                 self.views.calendar_offset = if d == 0 { 0 } else { self.views.calendar_offset + d };
                 self.mark_all();
-            }
-            Action::Mode(m) => {
-                services::spawn_shell(&format!("creed mode set {}", shell_quote(&m)));
-                self.close_popups();
             }
         }
     }
@@ -1633,10 +1625,6 @@ pub fn uptime() -> String {
     }
 }
 
-fn shell_quote(s: &str) -> String {
-    format!("'{}'", s.replace('\'', "'\\''"))
-}
-
 pub fn apply_spec(layer: &LayerSurface, spec: &Spec) {
     layer.set_anchor(spec.anchor);
     layer.set_size(spec.size.0, spec.size.1);
@@ -1910,7 +1898,7 @@ impl PointerHandler for App {
                             }
                         } else if button == 0x112 {
                             // Middle click on a notification / tray: dismiss / secondary.
-                            if let Action::NotifAction(id, _) | Action::NotifDismiss(id) = h.action {
+                            if let Action::NotifInvoke(id, _) | Action::NotifDismiss(id) = h.action {
                                 self.perform(Action::NotifDismiss(id));
                             }
                         }

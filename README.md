@@ -342,7 +342,9 @@ Hyprland's own `--verify-config`:
 - apply → re-apply → status → revert for every tweak, with a byte-for-byte restore check
 - a check that cleanups delete only caches
 - setup → uninstall restoring a user's original files
+- lint: clippy with warnings as errors, shellcheck, pyflakes
 - generated app themes checked by the apps' own parsers (foot, starship, Lua, Qt, …)
+- the polkit rule, evaluated case by case (only local, active admins running the helper)
 - the CLI: every command, bad input (non-zero exit, a message, never a panic) and config
   round trips
 - Creed Settings: every page, edits reaching the config, the welcome flow
@@ -381,6 +383,14 @@ Layout:
 - **Live previews need Hyprland.** The overview and Task View show live window previews
   through Hyprland's toplevel-export protocol. On other compositors they fall back to app
   icons.
+
+- **What the automated tests cannot see.** The suite runs headless without a GPU, so it
+  checks Hyprland configs with `--verify-config` but never sees Hyprland draw:
+  - the compositor's blur and refraction behind glass;
+  - hyprbars titlebars;
+  - live window previews;
+  - hyprlock's rendering;
+  - polkit inside a real logind session (the rule's logic is tested on its own).
 
 ## Licence
 

@@ -74,7 +74,7 @@ pub fn draw(ui: &mut Ui, closing: bool, views: &mut Views) {
     if items.is_empty() {
         super::empty(ui, grid, "face-uncertain-symbolic", "No emoji found");
     } else {
-        let rows = (items.len() + COLS - 1) / COLS;
+        let rows = items.len().div_ceil(COLS);
         let sel_row = views.sel / COLS;
         let total = rows as f64 * cell;
         let sel_top = sel_row as f64 * cell;

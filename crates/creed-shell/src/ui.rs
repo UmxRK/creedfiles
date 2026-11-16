@@ -102,7 +102,6 @@ pub enum Slider {
     Volume,
     Mic,
     Brightness,
-    Glass(&'static str),
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -111,7 +110,6 @@ pub enum Action {
     Toggle(Kind),
     Open(Kind),
     Close(Kind),
-    CloseAll,
     /// Run a shell command (detached).
     Exec(String),
     /// Launch an application by desktop-file id.
@@ -135,7 +133,7 @@ pub enum Action {
     MediaNext,
     MediaPrev,
     NotifDismiss(u32),
-    NotifAction(u32, String),
+    NotifInvoke(u32, String),
     NotifClear,
     TrayActivate(String),
     TrayMenu(String),
@@ -157,7 +155,6 @@ pub enum Action {
     TodoToggle(usize),
     TodoDelete(usize),
     BrightnessStep(f64),
-    Mode(String),
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
@@ -230,7 +227,6 @@ pub struct Ui<'a> {
     pub dt: f64,
     pub animating: bool,
     pub size: (f64, f64),
-    pub now: f64,
 }
 
 impl<'a> Ui<'a> {
@@ -394,8 +390,14 @@ impl<'a> Ui<'a> {
         if self.focus == Some(key) {
             self.th.focus_ring(self.cr, r, radius);
         }
+        let scroll: Option<fn(f64) -> Action> = match which {
+            Slider::Volume => Some(|d| Action::VolumeStep(d * 0.05)),
+            Slider::Brightness => Some(|d| Action::BrightnessStep(d * 0.05)),
+            Slider::Mic => None,
+        };
         let hit = self.hit(key, r, Action::Slider(which), Role::Slider, label);
         hit.value = Some(value);
+        hit.scroll = scroll;
         // Icon hit must win over the slider: move it after.
         let n = self.hits.len();
         self.hits.swap(n - 1, n - 2);

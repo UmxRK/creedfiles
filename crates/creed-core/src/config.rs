@@ -644,7 +644,7 @@ pub fn unset_key(doc_text: &str, key: &str) -> Result<String, String> {
     for p in &parts[..parts.len() - 1] {
         match cur.get_mut(*p) {
             Some(toml::Value::Table(t)) => cur = t,
-            _ => return Ok(toml::to_string_pretty(&table).map_err(|e| e.to_string())?),
+            _ => return toml::to_string_pretty(&table).map_err(|e| e.to_string()),
         }
     }
     cur.remove(parts[parts.len() - 1]);

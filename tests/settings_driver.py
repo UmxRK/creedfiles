@@ -3,7 +3,6 @@ any Python exception, and checks that edits made through the app's Store reach t
 Run by tests/settings.sh; prints one line per check and exits non-zero on failure."""
 import importlib.machinery
 import importlib.util
-import os
 import subprocess
 import sys
 import time

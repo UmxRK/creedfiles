@@ -64,7 +64,7 @@ pub fn draw(ui: &mut Ui, closing: bool, data: &Data, views: &mut Views) {
     let cell_w = 120.0;
     let cell_h = 74.0;
     let cols = 3;
-    let rows = (LAYOUTS.len() + cols - 1) / cols;
+    let rows = LAYOUTS.len().div_ceil(cols);
     let target = data.clients.iter().find(|c| c.address == views.snap_target);
     let extra = 4.0 * 40.0 + 30.0; // window actions row
     let w = cols as f64 * (cell_w + 12.0) + 24.0;

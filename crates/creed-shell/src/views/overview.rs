@@ -107,7 +107,7 @@ fn grid(area: Rect, n: usize, aspect: f64, gap: f64) -> Vec<Rect> {
     }
     let mut best = (1usize, 0.0f64);
     for cols in 1..=n {
-        let rows = (n + cols - 1) / cols;
+        let rows = n.div_ceil(cols);
         let cw = (area.w - gap * (cols as f64 - 1.0)) / cols as f64;
         let ch = (area.h - gap * (rows as f64 - 1.0)) / rows as f64;
         let w = cw.min(ch * aspect);
@@ -116,7 +116,7 @@ fn grid(area: Rect, n: usize, aspect: f64, gap: f64) -> Vec<Rect> {
         }
     }
     let cols = best.0;
-    let rows = (n + cols - 1) / cols;
+    let rows = n.div_ceil(cols);
     let w = best.1.min(460.0);
     let h = w / aspect;
     let total_h = rows as f64 * h + (rows as f64 - 1.0) * gap;

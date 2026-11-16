@@ -1,5 +1,8 @@
 //! Shared logic for the Creed shell, CLI and helper.
 
+// `Edge::from_str` etc. parse config words (not FromStr: they never fail).
+#![allow(clippy::should_implement_trait, clippy::type_complexity)]
+
 pub mod color;
 pub mod config;
 pub mod hardware;

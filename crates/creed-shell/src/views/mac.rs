@@ -876,7 +876,7 @@ fn banner(ui: &mut Ui, mm: &M, r: Rect, n: &crate::data::Notif) {
     if !n.body.is_empty() {
         ui.text(Rect::new(tx, r.y + 31.0, r.w - 54.0 - 14.0, 34.0), &super::notif::strip_markup(&n.body), &Text::new(13.0, mm.label).lines(2));
     }
-    let default = n.actions.iter().find(|(k, _)| k == "default").map(|(k, _)| Action::NotifAction(n.id, k.clone())).unwrap_or(Action::NotifDismiss(n.id));
+    let default = n.actions.iter().find(|(k, _)| k == "default").map(|(k, _)| Action::NotifInvoke(n.id, k.clone())).unwrap_or(Action::NotifDismiss(n.id));
     ui.hit(k, r, default, Role::Item, format!("{}: {}", n.app, n.summary));
     if hv > 0.05 {
         // Close button on the top-left corner, as on macOS.

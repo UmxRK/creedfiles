@@ -1,4 +1,6 @@
 //! creed-shell: the Creed desktop shell (bar, dock, panels, notifications, wallpaper).
+// Style-only lints: the immediate-mode UI passes explicit geometry and colours by design.
+#![allow(clippy::too_many_arguments, clippy::type_complexity, clippy::needless_range_loop, clippy::field_reassign_with_default)]
 
 mod a11y;
 mod app;

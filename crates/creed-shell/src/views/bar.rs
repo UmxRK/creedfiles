@@ -779,7 +779,7 @@ fn draw_taskbar(ui: &mut Ui, r: Rect, data: &Data, variant: &str) {
         let c = Rect::new(r.x + i as f64 * cell, r.y, cell, r.h);
         let k = ui::idn("bar.task", id);
         let hv = ui.hover_amt(k);
-        let active = wins.iter().any(|a| *a == data.active_addr);
+        let active = wins.contains(&data.active_addr);
         let box_r = Rect::centered(c.cx(), c.cy(), cell - 6.0, if variant == "win10" { r.h } else { cell - 6.0 });
         let radius = if variant == "win10" { 0.0 } else { th.radius_small().min(6.0) };
         if active {

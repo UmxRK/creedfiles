@@ -40,7 +40,7 @@ impl Paths {
         let cache = xdg("XDG_CACHE_HOME", &home, ".cache").join("creed");
         let runtime = env::var_os("XDG_RUNTIME_DIR")
             .map(PathBuf::from)
-            .unwrap_or_else(|| env::temp_dir())
+            .unwrap_or_else(env::temp_dir)
             .join("creed");
         Paths { config, data, state, cache, runtime, home }
     }

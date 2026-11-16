@@ -155,12 +155,6 @@ impl Theme {
     pub fn radius_small(&self) -> f64 {
         self.cfg.style.radius_small
     }
-    pub fn pad(&self) -> f64 {
-        self.cfg.style.padding
-    }
-    pub fn gap(&self) -> f64 {
-        self.cfg.style.spacing
-    }
     pub fn motion(&self) -> Motion {
         self.cfg.effective_motion()
     }

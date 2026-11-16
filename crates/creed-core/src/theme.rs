@@ -504,6 +504,15 @@ pub fn procedural_seed(name: &str) -> Option<palette::Seed> {
     })
 }
 
+/// Applies a user accent override to a fixed system palette.
+pub fn with_accent(mut p: Palette, accent: Option<Color>) -> Palette {
+    if let Some(a) = accent {
+        p.accent = a;
+        p.on_accent = if a.contrast(&Color::WHITE) >= a.contrast(&Color::BLACK) { Color::WHITE } else { Color::BLACK };
+    }
+    p
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -558,13 +567,4 @@ mod tests {
         cfg.appearance.motion = Motion::Expressive;
         assert!(animations_block(&cfg, "macos").contains("popin 85%"));
     }
-}
-
-/// Applies a user accent override to a fixed system palette.
-pub fn with_accent(mut p: Palette, accent: Option<Color>) -> Palette {
-    if let Some(a) = accent {
-        p.accent = a;
-        p.on_accent = if a.contrast(&Color::WHITE) >= a.contrast(&Color::BLACK) { Color::WHITE } else { Color::BLACK };
-    }
-    p
 }

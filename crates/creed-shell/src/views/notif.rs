@@ -79,7 +79,7 @@ fn card(ui: &mut Ui, r: Rect, n: &Notif, in_center: bool) {
         let clean = strip_markup(&n.body);
         ui.text(body_r, &clean, &Text::new(th.fs * 0.95, p.subtext).lines(3));
     }
-    let default_action = n.actions.iter().find(|(k, _)| k == "default").map(|(k, _)| Action::NotifAction(n.id, k.clone())).unwrap_or(Action::NotifDismiss(n.id));
+    let default_action = n.actions.iter().find(|(k, _)| k == "default").map(|(k, _)| Action::NotifInvoke(n.id, k.clone())).unwrap_or(Action::NotifDismiss(n.id));
     ui.hit(k, r, default_action, Role::Item, format!("Notification from {}: {}. {}", n.app, n.summary, strip_markup(&n.body)));
     if has_actions {
         let acts: Vec<&(String, String)> = n.actions.iter().filter(|(k, _)| k != "default").take(3).collect();
@@ -90,7 +90,7 @@ fn card(ui: &mut Ui, r: Rect, n: &Notif, in_center: bool) {
             let ahv = ui.hover_amt(ak);
             th.chip(ui.cr, cols[i], 16.0, ahv, false);
             ui.text(cols[i], label, &Text::new(th.fs * 0.9, p.text).medium().center());
-            ui.hit(ak, cols[i], Action::NotifAction(n.id, key.clone()), Role::Button, label.clone());
+            ui.hit(ak, cols[i], Action::NotifInvoke(n.id, key.clone()), Role::Button, label.clone());
         }
     }
     // Close button appears on hover.

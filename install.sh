@@ -313,6 +313,7 @@ main() {
   setup_sddm
   echo
   say "All done."
+  # shellcheck disable=SC1111  # typographic quotes in user-facing text
   info "Log out and pick “Hyprland” at the login screen. Creed Settings opens on first login"
   info "so you can choose a mode. Useful commands: creed help · creed doctor · creed uninstall"
   info "Install log: $LOG"

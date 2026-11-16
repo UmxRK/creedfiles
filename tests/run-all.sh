@@ -11,6 +11,12 @@ stage "Unit tests"
 cargo test --release --workspace 2>&1 | grep -E "^test result|FAILED|panicked" || true
 cargo test --release --workspace >/dev/null 2>&1 || fail "unit tests"
 
+stage "Lint: clippy (warnings are errors), shellcheck, pyflakes"
+cargo clippy --release --workspace --all-targets -- -D warnings >/dev/null 2>&1 || fail "clippy"
+shellcheck -S warning -s bash install.sh helper/creed-helper scripts/*.sh tweaks/lib.sh tweaks/*/*/{apply,revert,plan,status} 2>/dev/null >/tmp/creed-shellcheck.txt || { cat /tmp/creed-shellcheck.txt | head -20; fail "shellcheck"; }
+pyflakes settings/creed-settings tests/*.py || fail "pyflakes"
+echo "  clean"
+
 stage "Build"
 cargo build --release >/dev/null 2>&1 || fail "build"
 install -m755 target/release/creed /usr/local/bin/creed
@@ -40,6 +46,9 @@ su tester -c tests/dispatchers.sh || fail "dispatchers"
 
 stage "Tweaks: apply → re-apply → status → revert (byte-identical), cleanup safety"
 tests/tweaks.sh | tail -25 || fail "tweaks"
+
+stage "polkit rule grants exactly local, active admins running the helper"
+node tests/polkit.js || fail "polkit rule"
 
 stage "setup → uninstall round trip"
 tests/roundtrip.sh || fail "round trip"

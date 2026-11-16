@@ -205,7 +205,7 @@ pub fn draw_module(ui: &mut Ui, name: &str, r: Rect, data: &Data) -> bool {
             for (i, (id, icon, wins)) in items.iter().enumerate() {
                 let c = Rect::new(r.x + i as f64 * W, r.y, W, r.h);
                 let k = ui::idn("w10.task", id);
-                let active = wins.iter().any(|a| *a == data.active_addr);
+                let active = wins.contains(&data.active_addr);
                 if active {
                     gfx::fill_rounded(ui.cr, c, 0.0, if t.dark { Color::rgba(1.0, 1.0, 1.0, 0.15) } else { Color::rgba(1.0, 1.0, 1.0, 0.7) });
                 }
@@ -448,7 +448,7 @@ fn toast_card(ui: &mut Ui, t: &Tok, r: Rect, n: &crate::data::Notif, in_center: 
     if !n.body.is_empty() {
         ui.text(Rect::new(r.x + 12.0, r.y + 58.0, r.w - 24.0, 60.0), &super::notif::strip_markup(&n.body), &Text::new(BODY, t.text2).lines(3));
     }
-    let default = n.actions.iter().find(|(k, _)| k == "default").map(|(k, _)| Action::NotifAction(n.id, k.clone())).unwrap_or(Action::NotifDismiss(n.id));
+    let default = n.actions.iter().find(|(k, _)| k == "default").map(|(k, _)| Action::NotifInvoke(n.id, k.clone())).unwrap_or(Action::NotifDismiss(n.id));
     ui.hit(k, r, default, Role::Item, format!("Notification from {}: {}", n.app, n.summary));
     if hv > 0.05 {
         let x = Rect::new(r.right() - 32.0, r.y + 4.0, 28.0, 28.0);
