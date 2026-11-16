@@ -19,6 +19,12 @@ install -m755 target/release/creed-shell /usr/local/bin/creed-shell
 stage "Every mode + variant validates with Hyprland --verify-config"
 su tester -c tests/verify-modes.sh || fail "hyprland configs"
 
+stage "Generated app themes pass the apps' own parsers (foot, starship, Lua, Qt…)"
+su tester -c tests/apps.sh || fail "app themes"
+
+stage "CLI: every command, bad input and config round trips"
+su tester -c tests/cli.sh || fail "cli"
+
 stage "Every shell dispatcher is accepted by Hyprland"
 su tester -c tests/dispatchers.sh || fail "dispatchers"
 
