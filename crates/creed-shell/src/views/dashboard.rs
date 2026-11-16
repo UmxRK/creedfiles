@@ -23,10 +23,31 @@ pub fn draw(ui: &mut Ui, closing: bool, data: &Data, views: &mut Views) {
     ui.cr.save().ok();
     ui.cr.push_group();
     popup_transform(ui, panel, t, th.cfg.bar.position == creed_core::config::Edge::Top);
-    th.panel(ui.cr, panel, th.radius() + 2.0, "dashboard", ui.pointer);
+    if variant == "widgets11" {
+        let t = super::fluent::tok(th);
+        super::fluent::flyout(ui.cr, &t, panel, super::fluent::OVERLAY_RADIUS);
+    } else {
+        th.panel(ui.cr, panel, th.radius() + 2.0, "dashboard", ui.pointer);
+    }
     ui.record("dashboard.panel", panel, None);
     ui.hit(ui::id("dashboard.panel"), panel, Action::None, Role::Group, "");
-    let inner = panel.inset(18.0);
+    let mut inner = panel.inset(18.0);
+    if variant == "widgets11" {
+        // Header: time on the left, "Search the web" in the middle, account on the right.
+        let t = super::fluent::tok(th);
+        let hdr = Rect::new(inner.x, inner.y, inner.w, 36.0);
+        ui.text(Rect::new(hdr.x + 4.0, hdr.y, 120.0, hdr.h), &time::format(time::now_secs(), &th.cfg.bar.clock_format), &Text::new(super::fluent::BODY, t.text1).bold());
+        let sb = Rect::centered(hdr.cx(), hdr.cy(), 320.0, 32.0);
+        gfx::fill_rounded(ui.cr, sb, 16.0, t.ctl_fill);
+        gfx::stroke_rounded(ui.cr, sb, 16.0, 1.0, t.ctl_stroke);
+        ui.icon(Rect::new(sb.x + 12.0, sb.y, 16.0, sb.h), "system-search-symbolic", 16.0, Some(t.text2));
+        ui.text(Rect::new(sb.x + 38.0, sb.y, sb.w - 50.0, sb.h), "Search the web", &Text::new(super::fluent::BODY, t.text2));
+        ui.hit(ui::id("w11.widgets.search"), sb, Action::Exec(format!("{} https://duckduckgo.com", th.cfg.general.browser)), Role::Button, "Search the web");
+        let av = Rect::new(hdr.right() - 32.0, hdr.cy() - 16.0, 32.0, 32.0);
+        gfx::fill_rounded(ui.cr, av, 16.0, t.ctl_fill2);
+        ui.icon(av, "avatar-default-symbolic", 16.0, Some(t.text1));
+        inner = Rect::new(inner.x, hdr.bottom() + 16.0, inner.w, inner.h - 52.0);
+    }
     match variant.as_str() {
         "widgets11" | "mac" => column_layout(ui, inner, data, views, variant == "widgets11"),
         _ => grid_layout(ui, inner, data, views),
@@ -37,6 +58,12 @@ pub fn draw(ui: &mut Ui, closing: bool, data: &Data, views: &mut Views) {
 }
 
 fn card(ui: &mut Ui, r: Rect) {
+    if ui.th.cfg.style.dashboard == "widgets11" {
+        let t = super::fluent::tok(ui.th);
+        gfx::fill_rounded(ui.cr, r, super::fluent::OVERLAY_RADIUS, t.card);
+        gfx::stroke_rounded(ui.cr, r, super::fluent::OVERLAY_RADIUS, 1.0, t.card_stroke);
+        return;
+    }
     let c = if ui.th.dark { Color::rgba(1.0, 1.0, 1.0, 0.05) } else { Color::rgba(0.0, 0.0, 0.0, 0.035) };
     gfx::fill_rounded(ui.cr, r, ui.th.radius_small() + 6.0, c);
 }

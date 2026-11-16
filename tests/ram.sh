@@ -31,6 +31,8 @@ echo "surfaces: $state"
 echo "PSS start: $((before/1024)) MB   PSS after cycling: $((after/1024)) MB   limit: $limit MB   idle CPU: ${idle_ticks} ticks/3s"
 awk '/^[0-9a-f]+-[0-9a-f]+ /{name=$6} /^Pss:/{if ($2>400) printf "  %6d kB %s\n", $2, name}' /proc/$pid/smaps | sort -rn | head -8
 $S stop >/dev/null 2>&1
-for k in bar dock wallpaper; do echo "$state" | grep -q "\"$k\"" || { echo "FAIL: $k not mapped"; exit 1; }; done
+need="bar wallpaper"
+grep -qE '^enabled = false' /src/modes/$mode/mode.toml 2>/dev/null && awk '/^\[dock\]/{f=1;next} /^\[/{f=0} f&&/^enabled = false/{x=1} END{exit !x}' /src/modes/$mode/mode.toml || need="$need dock"
+for k in $need; do echo "$state" | grep -q "\"$k\"" || { echo "FAIL: $k not mapped"; exit 1; }; done
 [ "$idle_ticks" -le 3 ] || { echo "FAIL: shell is busy while idle"; exit 1; }
 [ $((after/1024)) -le "$limit" ] && echo PASS || { echo FAIL; exit 1; }

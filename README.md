@@ -99,7 +99,42 @@ A mode switch re-themes all of these together:
 - Firefox (optional)
 - the SDDM login screen (optional)
 
-No Microsoft or Apple artwork, logos or fonts are included. The modes use free look-alikes.
+### How faithful the OS modes are
+
+The Windows and macOS modes copy the real systems' layouts and design tokens. They are
+not loose re-imaginings.
+
+**Windows 11 and 10**
+- Colours, fills, strokes, Acrylic/Mica tints and corner radii are Microsoft's own values
+  from the open-source WinUI theme resources (8 px overlays, 4 px controls).
+- Icons are Microsoft's **Fluent System Icons** (MIT licence), shipped as the `Creed-Fluent`
+  icon theme.
+- Text is set in **Segoe UI Variable** if you have it installed, otherwise Microsoft's
+  open-source **Selawik**, which has the same metrics (downloaded by the installer).
+- Layouts match the shipping system:
+  - **Windows 11:** a 48 px taskbar with 40 px buttons and 6 / 16 px running pills, the
+    642×726 Start menu with Pinned (6×3) and Recommended, the 360 px Quick Settings grid,
+    Notification Center with the calendar, 364 px toasts, the 24H2 volume pill, and Task View.
+  - **Windows 10:** a 40 px taskbar with the 344 px search box, the Start menu with its rail,
+    app list and live tiles, the full-height Action Center, and the vertical volume OSD.
+  - Terminal colours are the Windows Terminal "Campbell" scheme.
+
+**macOS**
+- Label and system colours are Apple's documented values (for example `#0A84FF` /
+  `#007AFF` blue).
+- Text is set in **SF Pro** if you install it yourself, otherwise Inter.
+- Menu bar: 24 px, 13 pt.
+- Control Center: 320 px, with the module layout of Wi-Fi/Bluetooth, Focus, Display, Sound
+  and Now Playing.
+- Spotlight: the Sequoia field, or the Tahoe glass pill with its four shortcut buttons.
+- Notification Center: banners with widgets underneath.
+- Volume HUD: the top-right slider.
+- Dock: magnification and running dots.
+- Status glyphs (Wi-Fi, battery, Control Center, Spotlight, sound) are drawn as vectors,
+  because SF Symbols may not be redistributed.
+
+**Not included:** the Windows and Apple logos, Apple's fonts, and the official wallpapers
+can't legally be shipped. Neutral stand-ins take their place.
 
 ### Liquid Glass and other materials
 
