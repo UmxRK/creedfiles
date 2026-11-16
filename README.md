@@ -244,8 +244,8 @@ tests/ram.sh 2560x1440 1 20 60 mac-tahoe
 
 | Setup | Limit | Measured |
 |---|---|---|
-| 1 monitor up to 1440p, any mode | 60 MB | see `tests/RESULTS.md` |
-| 4K or multi-monitor | 120 MB | see `tests/RESULTS.md` |
+| 1 monitor up to 1440p, any mode | 60 MB | 24–32 MB |
+| 4K or multi-monitor | 120 MB | 37–42 MB |
 
 Run `creed ram` to check your own machine.
 
