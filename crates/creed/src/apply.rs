@@ -126,6 +126,10 @@ pub fn apply(mode: Option<&str>, reload: bool) -> Result<(), String> {
         for (k, v) in sets {
             let _ = Command::new("gsettings").args(["set", "org.gnome.desktop.interface", k, &v]).stderr(Stdio::null()).status();
         }
+        // Window buttons where the OS puts them: traffic lights on the left on macOS.
+        let family = creed_core::theme::family(&cfg);
+        let layout = if family == "macos" { "close,minimize,maximize:" } else { ":minimize,maximize,close" };
+        let _ = Command::new("gsettings").args(["set", "org.gnome.desktop.wm.preferences", "button-layout", layout]).stderr(Stdio::null()).status();
     }
     if reload {
         if let Some(h) = Hypr::from_env() {

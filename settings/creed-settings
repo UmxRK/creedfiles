@@ -299,6 +299,9 @@ class ModesPage(Gtk.ScrolledWindow):
     def after(self, ok, out, name):
         self.win.toast(f"{name} is on" if ok else out)
         self.win.store.reload()
+        app = self.win.get_application()
+        if app is not None and hasattr(app, "follow_scheme"):
+            app.follow_scheme()
         self.populate()
         return False
 
@@ -663,8 +666,37 @@ class Window(Adw.ApplicationWindow):
         for name, title, icon, widget in pages:
             pg = self.stack.add_titled(widget, name, title)
             pg.set_icon_name(icon)
-        sidebar = Gtk.StackSidebar(stack=self.stack, vexpand=True)
-        sidebar.set_size_request(210, -1)
+        # Sidebar like Windows Settings / macOS System Settings: search field, then pages with icons.
+        self.nav = Gtk.ListBox(css_classes=["navigation-sidebar"], vexpand=True)
+        self.nav.set_size_request(230, -1)
+        self.nav_rows = {}
+        for name, title, icon, _w in pages:
+            row = Gtk.ListBoxRow()
+            row.page_name, row.page_title = name, title
+            box = Gtk.Box(spacing=12, margin_top=6, margin_bottom=6, margin_start=6)
+            box.append(Gtk.Image(icon_name=icon))
+            box.append(Gtk.Label(label=title, xalign=0))
+            row.set_child(box)
+            row.update_property([Gtk.AccessibleProperty.LABEL], [title])
+            self.nav.append(row)
+            self.nav_rows[name] = row
+        self.nav.connect("row-selected", lambda _l, r: r and self.stack.set_visible_child_name(r.page_name))
+        self.stack.connect("notify::visible-child-name", lambda st, _p: self._sync_nav(st.get_visible_child_name()))
+        search = Gtk.SearchEntry(placeholder_text="Find a setting", margin_start=8, margin_end=8, margin_top=4, margin_bottom=6)
+        search.update_property([Gtk.AccessibleProperty.LABEL], ["Find a setting"])
+
+        def on_search(entry):
+            q = entry.get_text().strip().lower()
+            self.nav.set_filter_func((lambda r: q in r.page_title.lower() or q in r.page_name) if q else None)
+            if q:
+                first = next((r for r in self.nav_rows.values() if q in r.page_title.lower() or q in r.page_name), None)
+                if first:
+                    self.nav.select_row(first)
+
+        search.connect("search-changed", on_search)
+        sidebar = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, vexpand=True)
+        sidebar.append(search)
+        sidebar.append(Gtk.ScrolledWindow(child=self.nav, vexpand=True, hscrollbar_policy=Gtk.PolicyType.NEVER))
 
         scope = Adw.SwitchRow(title="Only this mode", subtitle="Changes apply to the current mode only", use_markup=False)
         scope.connect("notify::active", lambda r, _p: setattr(self.store, "mode_only", r.get_active()))
@@ -676,7 +708,13 @@ class Window(Adw.ApplicationWindow):
         side.append(scope_box)
         split = Adw.NavigationSplitView()
         split.set_sidebar(Adw.NavigationPage(title="Creed", child=self._with_header(side, False)))
-        split.set_content(Adw.NavigationPage(title="Settings", child=self._with_header(self.stack, True)))
+        # Big page title above the content (Windows Settings / System Settings style).
+        self.page_title = Gtk.Label(xalign=0, css_classes=["title-1"], margin_start=24, margin_top=4, margin_bottom=8)
+        content = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+        content.append(self.page_title)
+        content.append(self.stack)
+        self.stack.set_vexpand(True)
+        split.set_content(Adw.NavigationPage(title="Settings", child=self._with_header(content, True)))
         self.toasts.set_child(split)
         self.set_content(self.toasts)
         if welcome:
@@ -684,6 +722,14 @@ class Window(Adw.ApplicationWindow):
             self.stack.set_visible_child_name("modes")
         elif start_page:
             self.stack.set_visible_child_name(start_page)
+        self._sync_nav(self.stack.get_visible_child_name())
+
+    def _sync_nav(self, name):
+        row = self.nav_rows.get(name)
+        if row is not None and hasattr(self, "page_title"):
+            self.page_title.set_label(row.page_title)
+        if row is not None and self.nav.get_selected_row() is not row:
+            self.nav.select_row(row)
 
     def _with_header(self, child, content):
         tv = Adw.ToolbarView()
@@ -722,7 +768,26 @@ class App(Adw.Application):
         self.activate()
         return 0
 
+    def follow_scheme(self):
+        """Light/dark like the active mode, without relying on the settings portal."""
+        ok, out = creed("config", "dump")
+        scheme, family = "auto", "creed"
+        if ok:
+            try:
+                d = json.loads(out)
+                scheme = (d.get("style") or {}).get("scheme") or (d.get("appearance") or {}).get("scheme") or "auto"
+                family = (d.get("meta") or {}).get("family") or "creed"
+            except ValueError:
+                pass
+        # Window buttons where the OS puts them (traffic lights on the left on macOS).
+        gs = Gtk.Settings.get_default()
+        if gs is not None:
+            gs.set_property("gtk-decoration-layout", "close,minimize,maximize:" if family == "macos" else ":minimize,maximize,close")
+        sm = Adw.StyleManager.get_default()
+        sm.set_color_scheme({"dark": Adw.ColorScheme.FORCE_DARK, "light": Adw.ColorScheme.FORCE_LIGHT}.get(scheme, Adw.ColorScheme.DEFAULT))
+
     def do_activate(self):
+        self.follow_scheme()
         prov = Gtk.CssProvider()
         prov.load_from_data(CSS)
         Gtk.StyleContext.add_provider_for_display(Gdk.Display.get_default(), prov, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)

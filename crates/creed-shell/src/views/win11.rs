@@ -4,7 +4,7 @@
 //! Task View. Colours, radii and type ramp come from `fluent`.
 
 use super::fluent::{self, tok, Tok, BODY, CAPTION, CONTROL_RADIUS, OVERLAY_RADIUS};
-use super::{calendar, Views};
+use super::Views;
 use crate::data::{Data, NetKind};
 use crate::gfx::{self, Rect, Text};
 use crate::time;
@@ -66,6 +66,14 @@ pub fn module_len(ui: &mut Ui, name: &str, data: &Data) -> Option<f64> {
             a.max(b) + 24.0
         }
         "notifications" => 36.0,
+        "keyboard" => {
+            if data.kb_layout.is_empty() {
+                0.0
+            } else {
+                let (a, b) = lang_lines(&data.kb_layout);
+                ui.measure(&a, &Text::new(CAPTION, t.text1)).0.max(ui.measure(&b, &Text::new(CAPTION, t.text1)).0) + 20.0
+            }
+        }
         "tray" => {
             if data.tray.is_empty() {
                 0.0
@@ -76,6 +84,86 @@ pub fn module_len(ui: &mut Ui, name: &str, data: &Data) -> Option<f64> {
         "taskbar" => super::bar::taskbar_items(ui, data).len() as f64 * SLOT,
         _ => return None,
     })
+}
+
+/// Windows 11 calendar flyout grid: month title on the left, ▲ ▼ on the right, six full weeks
+/// with the neighbouring months' days dimmed and today in an accent circle.
+fn month(ui: &mut Ui, t: &Tok, r: Rect, offset: i32) {
+    let now = time::local(time::now_secs());
+    let (year, mon) = time::add_months(now.year, now.month, offset);
+    let (hdr, rest) = r.take_top(36.0, 6.0);
+    let tk = ui::id("cal.title");
+    let hv = ui.hover_amt(tk);
+    let title = Rect::new(hdr.x, hdr.y + 2.0, hdr.w - 80.0, hdr.h - 4.0);
+    fluent::subtle(ui.cr, t, title, CONTROL_RADIUS, hv * if offset != 0 { 1.0 } else { 0.0 }, false);
+    ui.text(title.inset_xy(8.0, 0.0), &format!("{} {}", time::MONTHS[(mon - 1) as usize], year), &Text::new(BODY, t.text1).bold());
+    ui.hit(tk, title, Action::Calendar(0), Role::Button, "Back to today");
+    for (i, (icon, label, d)) in [("go-up-symbolic", "Previous month", -1), ("go-down-symbolic", "Next month", 1)].into_iter().enumerate() {
+        let b = Rect::new(hdr.right() - 76.0 + i as f64 * 38.0, hdr.cy() - 16.0, 36.0, 32.0);
+        let k = ui::id(if d < 0 { "cal.prev" } else { "cal.next" });
+        let hv = ui.hover_amt(k);
+        fluent::subtle(ui.cr, t, b, CONTROL_RADIUS, hv, ui.is_pressed(k));
+        ui.icon(b, icon, 14.0, Some(t.text1));
+        ui.hit(k, b, Action::Calendar(d), Role::Button, label);
+    }
+    let (dow, grid) = rest.take_top(26.0, 2.0);
+    let names = ["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"];
+    let cw = dow.w / 7.0;
+    for (i, n) in names.iter().enumerate() {
+        ui.text(Rect::new(dow.x + i as f64 * cw, dow.y, cw, dow.h), n, &Text::new(CAPTION, t.text1).center());
+    }
+    let first = ((time::weekday(year, mon, 1) + 6) % 7) as i64;
+    let days = time::days_in_month(year, mon) as i64;
+    let (py, pm) = time::add_months(year, mon, -1);
+    let prev_days = time::days_in_month(py, pm) as i64;
+    let ch = (grid.h / 6.0).min(cw);
+    for i in 0..42i64 {
+        let cell = Rect::new(grid.x + (i % 7) as f64 * cw, grid.y + (i / 7) as f64 * ch, cw, ch);
+        let d = i - first + 1;
+        let (label, inside) = if d < 1 { (prev_days + d, false) } else if d > days { (d - days, false) } else { (d, true) };
+        let today = inside && offset == 0 && d == now.day as i64;
+        if today {
+            let s = (ch.min(cw) - 4.0).min(36.0);
+            gfx::fill_rounded(ui.cr, Rect::centered(cell.cx(), cell.cy(), s, s), s / 2.0, t.accent);
+        }
+        let col = if today { t.on_accent } else if inside { t.text1 } else { t.text3 };
+        ui.text(cell, &label.to_string(), &Text::new(CAPTION, col).center());
+    }
+}
+
+/// Windows' two-line input indicator from a layout name: "English (UK)" → ("ENG", "UK"),
+/// "us" → ("ENG", "US"), "German" → ("DEU", "").
+pub fn lang_lines(layout: &str) -> (String, String) {
+    const LANGS: &[(&str, &str)] = &[
+        ("english", "ENG"), ("german", "DEU"), ("french", "FRA"), ("spanish", "ESP"), ("italian", "ITA"),
+        ("portuguese", "POR"), ("russian", "РУС"), ("polish", "POL"), ("dutch", "NLD"), ("swedish", "SWE"),
+        ("norwegian", "NOR"), ("danish", "DAN"), ("finnish", "FIN"), ("turkish", "TRK"), ("japanese", "JPN"),
+        ("korean", "KOR"), ("chinese", "CHN"),
+    ];
+    let l = layout.trim();
+    let lower = l.to_lowercase();
+    let region = l.split_once('(').and_then(|(_, r)| r.split(')').next()).map(|r| r.trim().to_uppercase()).filter(|r| r.len() <= 4).unwrap_or_default();
+    if let Some((_, code)) = LANGS.iter().find(|(k, _)| lower.starts_with(k)) {
+        return (code.to_string(), region);
+    }
+    // Bare xkb codes.
+    match lower.as_str() {
+        "us" => ("ENG".into(), "US".into()),
+        "gb" | "uk" => ("ENG".into(), "UK".into()),
+        _ => (l.chars().take(3).collect::<String>().to_uppercase(), region),
+    }
+}
+
+#[cfg(test)]
+mod lang_tests {
+    #[test]
+    fn indicator() {
+        assert_eq!(super::lang_lines("English (UK)"), ("ENG".into(), "UK".into()));
+        assert_eq!(super::lang_lines("English (US)"), ("ENG".into(), "US".into()));
+        assert_eq!(super::lang_lines("us"), ("ENG".into(), "US".into()));
+        assert_eq!(super::lang_lines("German"), ("DEU".into(), "".into()));
+        assert_eq!(super::lang_lines("Czech"), ("CZE".into(), "".into()));
+    }
 }
 
 /// Draws one Windows 11 taskbar module; returns false if the module is not a Win11 one.
@@ -140,6 +228,18 @@ pub fn draw_module(ui: &mut Ui, name: &str, r: Rect, data: &Data) -> bool {
             ui.text(tr, &super::bar::clock_text(ui), &Text::new(CAPTION, t.text1).end());
             ui.text(Rect::new(tr.x, tr.y + 17.0, tr.w, 17.0), &time::format(now, &ui.th.cfg.bar.date_format), &Text::new(CAPTION, t.text1).end());
             ui.hit(key, r, Action::Toggle(Kind::NotifCenter), Role::Button, format!("Clock {}", time::format(now, "%A %d %B %H:%M")));
+        }
+        "keyboard" => {
+            if data.kb_layout.is_empty() {
+                return true;
+            }
+            let b = btn(r);
+            let hv = ui.hover_amt(key);
+            fluent::subtle(ui.cr, &t, b, CONTROL_RADIUS, hv, ui.is_pressed(key));
+            let (a, l2) = lang_lines(&data.kb_layout);
+            ui.text(Rect::new(b.x, b.y + 3.0, b.w, 17.0), &a, &Text::new(CAPTION, t.text1).center());
+            ui.text(Rect::new(b.x, b.y + 20.0, b.w, 17.0), &l2, &Text::new(CAPTION, t.text1).center());
+            ui.hit(key, r, Action::Exec("hyprctl switchxkblayout all next".into()), Role::Button, format!("Input language {}", data.kb_layout));
         }
         "notifications" => {
             let b = btn(r);
@@ -278,6 +378,23 @@ pub fn start(ui: &mut Ui, t_open: f64, data: &Data, views: &mut Views) {
     ui.icon(av, "avatar-default-symbolic", 16.0, Some(t.text1));
     ui.text(Rect::new(av.right() + 12.0, user.y, user.w - 56.0, user.h), &data.user, &Text::new(CAPTION, t.text1));
     ui.hit(uk, user, Action::Exec("creed-settings".into()), Role::Button, format!("Account {}", data.user));
+    // Folder shortcuts beside Power (Start → Personalization → Folders defaults on).
+    let folders: [(&str, &str, &str); 5] = [
+        ("text-x-generic-symbolic", "Documents", "xdg-open \"$(xdg-user-dir DOCUMENTS)\""),
+        ("folder-download-symbolic", "Downloads", "xdg-open \"$(xdg-user-dir DOWNLOAD)\""),
+        ("folder-pictures-symbolic", "Pictures", "xdg-open \"$(xdg-user-dir PICTURES)\""),
+        ("system-file-manager-symbolic", "File Explorer", ""),
+        ("emblem-system-symbolic", "Settings", "creed-settings"),
+    ];
+    for (i, (icon, label, cmd)) in folders.iter().enumerate() {
+        let fr = Rect::new(foot.right() - 52.0 - 40.0 - (folders.len() - i) as f64 * 40.0, foot.cy() - 20.0, 40.0, 40.0);
+        let fk = ui::idn("start.folder", i);
+        let hv = ui.hover_amt(fk);
+        fluent::subtle(ui.cr, &t, fr, CONTROL_RADIUS, hv, ui.is_pressed(fk));
+        ui.icon(fr, icon, 16.0, Some(t.text1));
+        let cmd = if cmd.is_empty() { ui.th.cfg.general.file_manager.clone() } else { cmd.to_string() };
+        ui.hit(fk, fr, Action::Exec(cmd), Role::Button, *label);
+    }
     let pw = Rect::new(foot.right() - 52.0 - 40.0, foot.cy() - 20.0, 40.0, 40.0);
     let pk = ui::id("start.power");
     let hv = ui.hover_amt(pk);
@@ -517,7 +634,7 @@ pub fn notif_center(ui: &mut Ui, t_open: f64, data: &Data, views: &mut Views) {
     let head = Rect::new(cal.x + 16.0, cal.y, cal.w - 32.0, 48.0);
     ui.text(head, &time::format(now, "%A, %-d %B"), &Text::new(BODY, t.text1).bold());
     gfx::fill_rounded(ui.cr, Rect::new(cal.x, head.bottom(), cal.w, 1.0), 0.0, t.divider);
-    calendar::draw_month(ui, Rect::new(cal.x + 12.0, head.bottom() + 10.0, cal.w - 24.0, cal.bottom() - head.bottom() - 70.0), views.calendar_offset);
+    month(ui, &t, Rect::new(cal.x + 12.0, head.bottom() + 10.0, cal.w - 24.0, cal.bottom() - head.bottom() - 70.0), views.calendar_offset);
     // Focus row
     let f = Rect::new(cal.x, cal.bottom() - 52.0, cal.w, 52.0);
     gfx::fill_rounded(ui.cr, Rect::new(f.x, f.y, f.w, 1.0), 0.0, t.divider);

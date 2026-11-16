@@ -20,7 +20,7 @@ margin = 0
 radius = 0
 left = ["widgets"]
 center = ["launcher", "search", "taskview", "taskbar"]
-right = ["tray", "network", "clock", "notifications"]
+right = ["tray", "keyboard", "network", "clock", "notifications"]
 clock_format = "%H:%M"
 date_format = "%x"
 
