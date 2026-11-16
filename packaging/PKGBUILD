@@ -12,7 +12,7 @@ depends=('base-devel' 'jq' 'hyprland>=0.57' 'hyprlock' 'hypridle' 'xdg-desktop-p
          'grim' 'slurp' 'wl-clipboard' 'cliphist' 'libnotify' 'curl'
          'cairo' 'pango' 'python' 'python-gobject' 'gtk4' 'libadwaita'
          'inter-font' 'ttf-jetbrains-mono' 'noto-fonts' 'noto-fonts-emoji' 'papirus-icon-theme' 'adwaita-icon-theme' 'adw-gtk-theme'
-         'foot' 'starship' 'pacman-contrib' 'zram-generator')
+         'foot' 'starship' 'pacman-contrib' 'zram-generator' 'sassc')
 optdepends=('hyprpolkitagent: password dialogs for apps'
             'hyprsunset: Night Light'
             'gamemode: Game Mode CPU governor'
@@ -60,13 +60,14 @@ package() {
   install -Dm644 packaging/creed.svg "$pkgdir/usr/share/icons/hicolor/scalable/apps/creed-settings.svg"
   install -d "$pkgdir/usr/share/creed" "$pkgdir/usr/share/icons"
   cp -r modes templates tweaks scripts defaults.toml "$pkgdir/usr/share/creed/"
-  cp -r icons/Creed-Fluent "$pkgdir/usr/share/icons/"
-  chmod -R u=rwX,go=rX "$pkgdir/usr/share/creed" "$pkgdir/usr/share/icons/Creed-Fluent"
+  cp -r icons/Creed-Fluent icons/Creed-Material "$pkgdir/usr/share/icons/"
+  chmod -R u=rwX,go=rX "$pkgdir/usr/share/creed" "$pkgdir/usr/share/icons/Creed-Fluent" "$pkgdir/usr/share/icons/Creed-Material"
   for t in sddm/*/; do
     install -d "$pkgdir/usr/share/sddm/themes/$(basename "$t")"
     cp -r "$t". "$pkgdir/usr/share/sddm/themes/$(basename "$t")/"
   done
   install -Dm644 LICENSE "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
   install -Dm644 icons/Creed-Fluent/LICENSE "$pkgdir/usr/share/licenses/$pkgname/FLUENT-ICONS-LICENSE"
+  install -Dm644 icons/Creed-Material/LICENSE "$pkgdir/usr/share/licenses/$pkgname/MATERIAL-SYMBOLS-LICENSE"
   install -Dm644 README.md "$pkgdir/usr/share/doc/$pkgname/README.md"
 }

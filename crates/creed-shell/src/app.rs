@@ -158,7 +158,7 @@ pub struct App {
 }
 
 pub fn load_theme(paths: &Paths) -> (Theme, Option<String>) {
-    let (cfg, err) = match Config::load(paths, None) {
+    let (mut cfg, err) = match Config::load(paths, None) {
         Ok(l) => (l.config, None),
         Err(e) => {
             // Keep running with the last good config (or defaults) and tell the user.
@@ -166,6 +166,7 @@ pub fn load_theme(paths: &Paths) -> (Theme, Option<String>) {
             (fallback, Some(e.to_string()))
         }
     };
+    cfg.resolve_themes(&paths.home);
     let pal = make_palette(paths, &cfg);
     (Theme::new(cfg, pal), err)
 }
@@ -230,7 +231,8 @@ impl App {
         let text_input_mgr = globals.bind::<ZwpTextInputManagerV3, _, _>(&qh, 1..=1, ()).ok();
         let toplevel_export = globals.bind::<crate::thumbs::protocol::hyprland_toplevel_export_manager_v1::HyprlandToplevelExportManagerV1, _, _>(&qh, 1..=1, ()).ok();
         let (theme, config_error) = load_theme(&paths);
-        let icons = Icons::new(&theme.cfg.style.icon_theme);
+        let mut icons = Icons::new(&theme.cfg.style.icon_theme);
+        icons.set_shell(theme.cfg.style.shell_icons.as_deref());
         let mut data = Data::default();
         data.user = std::env::var("USER").unwrap_or_default();
         data.host = hostname();
@@ -1325,6 +1327,8 @@ impl App {
         self.theme = theme;
         self.config_error = err.clone();
         self.icons.set_theme(&icon_theme);
+        let shell_icons = self.theme.cfg.style.shell_icons.clone();
+        self.icons.set_shell(shell_icons.as_deref());
         if let Some(e) = err {
             eprintln!("creed-shell: config error: {e}");
             self.on_msg(Msg::Notify(Notif {

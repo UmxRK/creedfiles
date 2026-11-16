@@ -110,6 +110,12 @@ pub fn draw_procedural(cr: &Context, name: &str, w: f64, h: f64, dark: bool) {
 
 fn draw_procedural_inner(cr: &Context, name: &str, w: f64, h: f64, dark: bool) {
     let m = w.max(h);
+    // Photo-backed names fall back to their closest drawn wallpaper when no photo is downloaded.
+    let name = match name {
+        "bigsur" => "aurora",
+        "sonoma" | "ventura" | "monterey" => "dunes",
+        n => n,
+    };
     match name {
         "dusk" => {
             vgrad(cr, w, h, &[(0.0, c("#1b1530")), (0.6, c("#3a2350")), (1.0, c("#5b2d4a"))]);
@@ -209,9 +215,14 @@ pub fn export_png(th: &crate::gfx::Theme, paths: &Paths, w: u32, h: u32, out: &s
         let cr = Context::new(&surf).map_err(|e| e.to_string())?;
         let wp = th.cfg.appearance.wallpaper.clone();
         let name = if wp.is_empty() { Some(default_for(th).to_string()) } else { wp.strip_prefix("creed://").map(str::to_string) };
-        match name {
-            Some(n) => draw_procedural(&cr, &n, w as f64, h as f64, th.dark),
-            None => match load_cover(&paths.expand(&wp), w, h) {
+        let photo = name.as_deref().and_then(|n| paths.wallpaper_photo(n, th.dark)).and_then(|p| load_cover(&p, w, h));
+        match (name, photo) {
+            (_, Some(img)) => {
+                let _ = cr.set_source_surface(&img, 0.0, 0.0);
+                let _ = cr.paint();
+            }
+            (Some(n), None) => draw_procedural(&cr, &n, w as f64, h as f64, th.dark),
+            (None, None) => match load_cover(&paths.expand(&wp), w, h) {
                 Some(img) => {
                     let _ = cr.set_source_surface(&img, 0.0, 0.0);
                     let _ = cr.paint();
@@ -235,7 +246,7 @@ fn default_for(th: &crate::gfx::Theme) -> &'static str {
         "win10" => "ribbon",
         "aqua" => "aqua",
         "mac" => match th.cfg.style.material {
-            creed_core::config::Material::Glass => "horizon",
+            creed_core::config::Material::Glass => "tahoe",
             _ => "dunes",
         },
         _ => "dawn",
@@ -252,17 +263,18 @@ pub fn draw(ui: &mut Ui, paths: &Paths) {
         "win10" => "ribbon",
         "aqua" => "aqua",
         "mac" => match ui.th.cfg.style.material {
-            creed_core::config::Material::Glass => "horizon",
+            creed_core::config::Material::Glass => "tahoe",
             _ => "dunes",
         },
         _ => "dawn",
     };
     let name = if wp.is_empty() { Some(default_name.to_string()) } else { wp.strip_prefix("creed://").map(str::to_string) };
-    if let Some(n) = name {
-        draw_procedural(cr, &n, w, h, dark);
+    let photo = name.as_deref().and_then(|n| paths.wallpaper_photo(n, dark));
+    if let (Some(n), None) = (&name, &photo) {
+        draw_procedural(cr, n, w, h, dark);
         return;
     }
-    let path = paths.expand(&wp);
+    let path = photo.unwrap_or_else(|| paths.expand(&wp));
     let scale = ui.icons.scale;
     let (pw, ph) = ((w * scale).round() as u32, (h * scale).round() as u32);
     match load_cover(&path, pw, ph) {

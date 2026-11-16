@@ -7,7 +7,7 @@ description = "The bright, rounded Big Sur era: light appearance, translucent me
 preview = "preview.png"
 
 [appearance]
-wallpaper = "creed://aurora"
+wallpaper = "creed://bigsur"
 color_source = "preset"
 scheme = "light"
 motion = "smooth"
@@ -51,9 +51,9 @@ shadow = 0.18
 material = "frost"
 window_mode = "float"
 titlebar = "mac"
-icon_theme = "WhiteSur"
-cursor_theme = "Adwaita"
-gtk_theme = "adw-gtk3"
+icon_theme = "WhiteSur{-dark}, MacTahoe{-dark}, Papirus-{Scheme}"
+cursor_theme = "MacTahoe-cursors, WhiteSur-cursors, Adwaita"
+gtk_theme = "MacTahoe-{Scheme}, WhiteSur-{Scheme}, adw-gtk3{-dark}"
 palette = "macos"
 scheme = "light"
 bar = "mac"

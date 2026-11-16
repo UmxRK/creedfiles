@@ -7,7 +7,7 @@ description = "Liquid Glass: clear, refractive bar, dock and panels with a movin
 preview = "preview.png"
 
 [appearance]
-wallpaper = "creed://horizon"
+wallpaper = "creed://tahoe"
 color_source = "preset"
 motion = "expressive"
 font = "Inter"
@@ -61,9 +61,9 @@ shadow = 0.25
 material = "glass"
 window_mode = "float"
 titlebar = "mac"
-icon_theme = "WhiteSur-dark"
-cursor_theme = "Adwaita"
-gtk_theme = "adw-gtk3-dark"
+icon_theme = "MacTahoe{-dark}, WhiteSur{-dark}, Papirus-{Scheme}"
+cursor_theme = "MacTahoe-cursors, WhiteSur-cursors, Adwaita"
+gtk_theme = "MacTahoe-{Scheme}, WhiteSur-{Scheme}, adw-gtk3{-dark}"
 palette = "macos"
 bar = "mac"
 dock = "mac"

@@ -51,6 +51,7 @@ TWEAKS (everything is explained before it runs)
 
 SYSTEM
   plugins build|status          Window titlebar plugin (hyprbars) for your Hyprland
+  assets [windows|macos|creed]  Download the free look-alike themes, wallpapers and fonts
   hardware [--json]             Detected GPU / CPU / laptop / RAM
   doctor                        Check the installation
   ram                           Memory used by Creed right now
@@ -247,6 +248,24 @@ fn run(args: &[String]) -> Result<(), String> {
             }
             other => Err(format!("unknown config command '{other}'")),
         },
+        "assets" => {
+            // Re-runs the look-alike asset download (icons, GTK themes, cursors, wallpapers, fonts).
+            let script = Paths::from_env().data.join("scripts/fetch-assets.sh");
+            let mut cmd = std::process::Command::new("bash");
+            cmd.arg(&script);
+            match a(1) {
+                "" => {}
+                "windows" | "macos" | "creed" => {
+                    cmd.args(["--only", a(1)]);
+                }
+                o => return Err(format!("unknown asset group '{o}' (windows, macos or creed)")),
+            }
+            let st = cmd.status().map_err(|e| format!("{}: {e}", script.display()))?;
+            let r = if st.success() { Ok(()) } else { Err("some assets could not be downloaded (re-run to retry)".to_string()) };
+            // Pick up the new themes/wallpapers right away.
+            let _ = apply::apply(None, true);
+            r
+        }
         "plugins" => match a(1) {
             "build" => {
                 let st = std::process::Command::new("bash").arg(apply::build_script()).status().map_err(|e| e.to_string())?;

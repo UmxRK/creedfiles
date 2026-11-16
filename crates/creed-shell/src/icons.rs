@@ -25,6 +25,7 @@ struct ThemeIndex {
 
 pub struct Icons {
     theme: String,
+    shell: Option<String>,
     bases: Vec<PathBuf>,
     themes: HashMap<String, Option<ThemeIndex>>,
     paths: HashMap<(String, u32), Option<PathBuf>>,
@@ -44,6 +45,7 @@ impl Icons {
         }
         let mut me = Icons {
             theme: String::new(),
+            shell: None,
             bases,
             themes: HashMap::new(),
             paths: HashMap::new(),
@@ -68,6 +70,16 @@ impl Icons {
         let light = !theme.to_lowercase().contains("dark");
         let candidates: &[&str] = if light { &["Papirus", "Papirus-Light", "Adwaita"] } else { &["Papirus-Dark", "Papirus", "Adwaita"] };
         candidates.iter().find(|c| self.installed(c)).map(|c| c.to_string()).unwrap_or_else(|| "hicolor".into())
+    }
+
+    /// Icon set consulted first for `-symbolic` names (the mode's own glyph style).
+    pub fn set_shell(&mut self, shell: Option<&str>) {
+        let shell = shell.filter(|s| self.installed(s)).map(str::to_string);
+        if shell != self.shell {
+            self.shell = shell;
+            self.paths.clear();
+            self.clear();
+        }
     }
 
     pub fn set_theme(&mut self, theme: &str) {
@@ -193,7 +205,14 @@ impl Icons {
         } else {
             let mut visited = vec![];
             let theme = self.theme.clone();
-            self.lookup_in(&theme, name, size, 0, &mut visited)
+            let shell = self.shell.clone().filter(|_| name.ends_with("-symbolic"));
+            shell
+                .and_then(|s| {
+                    // Only the set itself, not what it inherits: misses fall through to the app theme.
+                    let idx = self.index(&s)?;
+                    idx.roots.iter().flat_map(|r| idx.dirs.iter().map(move |d| r.join(&d.path).join(format!("{name}.svg")))).find(|p| p.is_file())
+                })
+                .or_else(|| self.lookup_in(&theme, name, size, 0, &mut visited))
                 .or_else(|| self.lookup_in("Adwaita", name, size, 0, &mut visited))
                 .or_else(|| self.lookup_in("hicolor", name, size, 0, &mut visited))
                 .or_else(|| {

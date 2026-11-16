@@ -1,0 +1,12 @@
+[Icon Theme]
+Name=Creed Material
+Comment=Google Material Symbols Rounded (Apache-2.0) under freedesktop names, for Creed mode
+Inherits=Papirus-Dark,Adwaita,hicolor
+Directories=symbolic
+
+[symbolic]
+Size=24
+MinSize=8
+MaxSize=512
+Type=Scalable
+Context=Status

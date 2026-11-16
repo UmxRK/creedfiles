@@ -103,7 +103,7 @@ hardware_summary() {
 PKGS_CORE=(base-devel hyprland hyprlock hypridle xdg-desktop-portal-hyprland xdg-desktop-portal-gtk
   qt5-wayland qt6-wayland qt6ct polkit wireplumber pipewire pipewire-pulse libpulse
   networkmanager bluez bluez-utils brightnessctl playerctl power-profiles-daemon
-  grim slurp wl-clipboard cliphist libnotify jq curl git rust gum
+  grim slurp wl-clipboard cliphist libnotify jq curl git rust gum sassc
   python python-gobject gtk4 libadwaita cairo pango
   inter-font ttf-jetbrains-mono noto-fonts noto-fonts-emoji papirus-icon-theme adwaita-icon-theme adw-gtk-theme
   foot thunar gvfs starship btop pacman-contrib zram-generator)
@@ -162,9 +162,11 @@ install_files() {
   sudo_run rm -rf "$D.new"
   sudo_run install -d "$D.new"
   sudo_run cp -r "$SRC/modes" "$SRC/templates" "$SRC/tweaks" "$SRC/scripts" "$SRC/defaults.toml" "$D.new/"
-  sudo_run rm -rf /usr/share/icons/Creed-Fluent
-  sudo_run cp -r "$SRC/icons/Creed-Fluent" /usr/share/icons/Creed-Fluent
-  sudo_run chmod -R u=rwX,go=rX /usr/share/icons/Creed-Fluent
+  for set in Creed-Fluent Creed-Material; do
+    sudo_run rm -rf "/usr/share/icons/$set"
+    sudo_run cp -r "$SRC/icons/$set" "/usr/share/icons/$set"
+    sudo_run chmod -R u=rwX,go=rX "/usr/share/icons/$set"
+  done
   sudo_run chown -R root:root "$D.new"
   sudo_run chmod -R u=rwX,go=rX "$D.new"
   sudo_run rm -rf "$D.old"
@@ -186,28 +188,15 @@ install_files() {
 fetch_assets() {
   [ "$ASSETS" = 1 ] || return 0
   say "Mode assets"
-  info "The Windows and macOS modes look best with free look-alike icon themes:"
-  info "  • Selawik font (Microsoft, OFL)  • Fluent icons (Windows modes)  • WhiteSur icons (macOS modes)"
-  info "They are downloaded from GitHub into ~/.local/share/icons (no admin rights)."
-  confirm "Download them now?" || { warn "Skipped - modes fall back to Papirus icons"; return 0; }
-  local tmp; tmp=$(mktemp -d)
-  # Selawik: Microsoft's open-source (OFL) font with Segoe UI metrics, used by the Windows modes.
-  if spin "Downloading Selawik font" curl -fsSL -o "$tmp/selawik.zip" https://github.com/microsoft/Selawik/releases/download/1.01/Selawik_Release.zip; then
-    if [ "$DRY" = 0 ]; then
-      mkdir -p "$HOME/.local/share/fonts/selawik"
-      python3 -c "import zipfile,sys; z=zipfile.ZipFile(sys.argv[1]); [open(sys.argv[2]+'/'+n,'wb').write(z.read(n)) for n in z.namelist() if n.endswith('.ttf')]" "$tmp/selawik.zip" "$HOME/.local/share/fonts/selawik" && fc-cache -f "$HOME/.local/share/fonts" >/dev/null 2>&1 && ok "Selawik font"
-    fi
-  else
-    warn "Could not download Selawik (Windows modes fall back to Inter)"
-  fi
-  for repo in Fluent-icon-theme WhiteSur-icon-theme; do
-    if spin "Downloading $repo" git clone --depth 1 "https://github.com/vinceliuice/$repo.git" "$tmp/$repo"; then
-      if [ "$DRY" = 0 ]; then (cd "$tmp/$repo" && ./install.sh -d "$HOME/.local/share/icons" >> "$LOG" 2>&1) && ok "$repo" || warn "$repo install failed (see log)"; fi
-    else
-      warn "Could not download $repo"
-    fi
-  done
-  rm -rf "$tmp"
+  info "Each mode looks like its real OS with free look-alike themes from open-source projects:"
+  info "  • Windows: Selawik font, Win11 icons, Fluent GTK theme + cursors, Bloom wallpapers"
+  info "  • macOS:   MacTahoe/WhiteSur icons, GTK theme + cursors, Tahoe/Big Sur/Sonoma wallpapers"
+  info "  • Creed:   Rubik and Gabarito fonts"
+  info "About 250 MB, downloaded from GitHub into your home folder (no admin rights)."
+  confirm "Download them now?" || { warn "Skipped - modes fall back to Papirus icons and drawn wallpapers (run: creed assets)"; return 0; }
+  if [ "$DRY" = 1 ]; then echo "  [dry-run] bash $PREFIX/share/creed/scripts/fetch-assets.sh"; return 0; fi
+  if bash "$PREFIX/share/creed/scripts/fetch-assets.sh" --log "$LOG"; then ok "All mode assets installed"
+  else warn "Some assets could not be downloaded - run \`creed assets\` later to retry (see $LOG)"; fi
 }
 
 # ───────────── titlebar plugin ─────────────

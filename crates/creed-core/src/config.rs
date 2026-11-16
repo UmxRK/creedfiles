@@ -322,6 +322,9 @@ pub struct Style {
     pub cursor_theme: String,
     pub cursor_size: u32,
     pub gtk_theme: String,
+    /// Icon set the shell uses for its own `-symbolic` glyphs before the app icon theme
+    /// (Fluent System Icons for Windows modes, Material Symbols for Creed).
+    pub shell_icons: Option<String>,
     pub font: Option<String>,
     pub scheme: Option<Scheme>,
     pub palette: Option<String>,
@@ -355,6 +358,7 @@ impl Default for Style {
             cursor_theme: "Adwaita".into(),
             cursor_size: 24,
             gtk_theme: "adw-gtk3-dark".into(),
+            shell_icons: None,
             font: None,
             scheme: None,
             palette: None,
@@ -586,6 +590,16 @@ impl Config {
 
     pub fn scheme(&self) -> Scheme {
         self.style.scheme.unwrap_or(self.appearance.scheme).resolve()
+    }
+
+    /// Replaces the icon / cursor / GTK theme candidate lists with the installed theme each one
+    /// resolves to (see `themes`). Call once after loading, before using those fields.
+    pub fn resolve_themes(&mut self, home: &std::path::Path) {
+        use crate::themes::{resolve, Kind};
+        let dark = self.scheme() == Scheme::Dark;
+        self.style.icon_theme = resolve(Kind::Icon, &self.style.icon_theme, dark, home);
+        self.style.cursor_theme = resolve(Kind::Cursor, &self.style.cursor_theme, dark, home);
+        self.style.gtk_theme = resolve(Kind::Gtk, &self.style.gtk_theme, dark, home);
     }
 }
 

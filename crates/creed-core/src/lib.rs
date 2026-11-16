@@ -10,6 +10,7 @@ pub mod palette;
 pub mod paths;
 pub mod template;
 pub mod theme;
+pub mod themes;
 pub mod tweak;
 
 pub use color::Color;

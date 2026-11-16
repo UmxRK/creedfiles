@@ -61,6 +61,23 @@ impl Paths {
         PathBuf::from("/usr/share/creed")
     }
 
+    /// Downloaded look-alike photo wallpapers (`creed setup` → mode assets).
+    pub fn wallpapers_dir(&self) -> PathBuf {
+        xdg("XDG_DATA_HOME", &self.home, ".local/share").join("creed/wallpapers")
+    }
+
+    /// Photo that stands in for the procedural wallpaper `creed://name` when the mode assets were
+    /// downloaded: `<name>-dark.jpg` / `<name>-light.jpg`, else `<name>.jpg`.
+    pub fn wallpaper_photo(&self, name: &str, dark: bool) -> Option<PathBuf> {
+        if name.is_empty() || name.contains('/') || name.contains("..") {
+            return None;
+        }
+        let d = self.wallpapers_dir();
+        let variant = d.join(format!("{name}-{}.jpg", if dark { "dark" } else { "light" }));
+        let plain = d.join(format!("{name}.jpg"));
+        [variant, plain].into_iter().find(|p| p.is_file())
+    }
+
     pub fn user_config(&self) -> PathBuf {
         self.config.join("creed.toml")
     }

@@ -26,6 +26,36 @@ pub struct Palette {
     pub shadow: Color,
     /// ANSI 0–15.
     pub term: [Color; 16],
+    /// Full Material 3 roles when the palette was generated with Material's TonalSpot scheme
+    /// (Creed mode); `None` for the exact Windows/macOS system palettes.
+    pub m3: Option<M3>,
+}
+
+/// Material 3 colour roles used by Creed's Material layout (containers, surface levels…).
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct M3 {
+    pub primary: Color,
+    pub on_primary: Color,
+    pub primary_container: Color,
+    pub on_primary_container: Color,
+    pub secondary: Color,
+    pub secondary_container: Color,
+    pub on_secondary_container: Color,
+    pub tertiary: Color,
+    pub tertiary_container: Color,
+    pub on_tertiary_container: Color,
+    pub surface: Color,
+    pub surface_container_lowest: Color,
+    pub surface_container_low: Color,
+    pub surface_container: Color,
+    pub surface_container_high: Color,
+    pub surface_container_highest: Color,
+    pub on_surface: Color,
+    pub on_surface_variant: Color,
+    pub outline: Color,
+    pub outline_variant: Color,
+    pub inverse_surface: Color,
+    pub inverse_on_surface: Color,
 }
 
 /// A seed fully determines a palette.
@@ -68,10 +98,23 @@ pub fn preset_seed(name: &str) -> Option<Seed> {
 }
 
 /// Extracts a seed from an image: the chroma-weighted dominant hue and a secondary hue.
+/// Extracts a seed from an image. The main hue is Material's own pick (Celebi quantizer +
+/// score, as Android and matugen do); the secondary hue comes from the hue histogram.
 pub fn seed_from_image(path: &Path) -> Result<Seed, String> {
     let img = image::open(path).map_err(|e| format!("{}: {e}", path.display()))?;
-    let small = img.thumbnail(96, 96).to_rgb8();
-    Ok(seed_from_pixels(small.pixels().map(|p| (p[0], p[1], p[2]))))
+    let small = img.thumbnail(112, 112).to_rgb8();
+    let mut seed = seed_from_pixels(small.pixels().map(|p| (p[0], p[1], p[2])));
+    let px: Vec<material_colors::color::Rgb> = small.pixels().map(|p| material_colors::color::Rgb::new(p[0], p[1], p[2])).collect();
+    use material_colors::quantize::Quantizer;
+    let q = material_colors::quantize::QuantizerCelebi::quantize(&px, 128);
+    if let Some(best) = material_colors::score::Score::score(&q.color_to_count, Some(1), None, None).first() {
+        let (_, ch, h) = from_rgb(*best).to_oklch();
+        if seed.tint >= 0.5 && ch > 0.02 {
+            seed.hue = h;
+            seed.accent_chroma = ch.clamp(0.08, 0.16);
+        }
+    }
+    Ok(seed)
 }
 
 pub fn seed_from_pixels(pixels: impl Iterator<Item = (u8, u8, u8)>) -> Seed {
@@ -114,6 +157,62 @@ pub fn seed_from_pixels(pixels: impl Iterator<Item = (u8, u8, u8)>) -> Seed {
     Seed { hue, alt_hue: alt, tint: 1.0, accent_chroma: (avg_chroma * 1.6).clamp(0.08, 0.15), fixed_accent: None }
 }
 
+fn to_rgb(c: Color) -> material_colors::color::Rgb {
+    let b = |v: f64| (v.clamp(0.0, 1.0) * 255.0).round() as u8;
+    material_colors::color::Rgb::new(b(c.r), b(c.g), b(c.b))
+}
+
+fn from_rgb(c: material_colors::color::Rgb) -> Color {
+    Color::rgba(c.red as f64 / 255.0, c.green as f64 / 255.0, c.blue as f64 / 255.0, 1.0)
+}
+
+/// Overlays Material 3 TonalSpot roles for `source` onto `base` (which keeps its terminal colours).
+/// With an explicit accent the user's colour is used as-is for `primary`.
+fn material(mut p: Palette, source: Color, dark: bool, high_contrast: bool, exact_accent: bool) -> Palette {
+    use material_colors::hct::Hct;
+    use material_colors::scheme::variant::SchemeTonalSpot;
+    let ds = SchemeTonalSpot::new(Hct::new(to_rgb(source)), dark, Some(if high_contrast { 1.0 } else { 0.0 })).scheme;
+    let s: material_colors::scheme::Scheme = ds.into();
+    let m = M3 {
+        primary: if exact_accent { source } else { from_rgb(s.primary) },
+        on_primary: from_rgb(s.on_primary),
+        primary_container: from_rgb(s.primary_container),
+        on_primary_container: from_rgb(s.on_primary_container),
+        secondary: from_rgb(s.secondary),
+        secondary_container: from_rgb(s.secondary_container),
+        on_secondary_container: from_rgb(s.on_secondary_container),
+        tertiary: from_rgb(s.tertiary),
+        tertiary_container: from_rgb(s.tertiary_container),
+        on_tertiary_container: from_rgb(s.on_tertiary_container),
+        surface: from_rgb(s.surface),
+        surface_container_lowest: from_rgb(s.surface_container_lowest),
+        surface_container_low: from_rgb(s.surface_container_low),
+        surface_container: from_rgb(s.surface_container),
+        surface_container_high: from_rgb(s.surface_container_high),
+        surface_container_highest: from_rgb(s.surface_container_highest),
+        on_surface: from_rgb(s.on_surface),
+        on_surface_variant: from_rgb(s.on_surface_variant),
+        outline: from_rgb(s.outline),
+        outline_variant: from_rgb(s.outline_variant),
+        inverse_surface: from_rgb(s.inverse_surface),
+        inverse_on_surface: from_rgb(s.inverse_on_surface),
+    };
+    p.bg = m.surface;
+    p.surface = m.surface_container_low;
+    p.surface_alt = m.surface_container_high;
+    p.overlay = m.surface_container_highest;
+    p.border = m.outline_variant;
+    p.text = m.on_surface;
+    p.subtext = m.on_surface_variant;
+    p.muted = m.outline;
+    p.accent = m.primary;
+    p.on_accent = if exact_accent { p.on_accent } else { m.on_primary };
+    p.accent_alt = m.tertiary;
+    p.error = from_rgb(s.error);
+    p.m3 = Some(m);
+    p
+}
+
 fn c(h: &str) -> Color {
     Color::parse(h).unwrap_or(Color::BLACK)
 }
@@ -141,43 +240,43 @@ pub fn system(name: &str, scheme: Scheme) -> Option<Palette> {
             scheme, bg: c("#202020"), surface: c("#2c2c2c"), surface_alt: c("#383838"), overlay: c("#ffffff15"),
             border: c("#ffffff12"), text: c("#ffffff"), subtext: c("#ffffffc5"), muted: c("#ffffff87"),
             accent: c("#4cc2ff"), accent_alt: c("#99ebff"), on_accent: c("#000000"),
-            success: c("#6ccb5f"), warning: c("#fce100"), error: c("#ff99a4"), shadow: c("#00000066"), term: term(CAMPBELL),
+            success: c("#6ccb5f"), warning: c("#fce100"), error: c("#ff99a4"), shadow: c("#00000066"), term: term(CAMPBELL), m3: None,
         },
         ("windows11", false) => Palette {
             scheme, bg: c("#f3f3f3"), surface: c("#f9f9f9"), surface_alt: c("#ffffff"), overlay: c("#00000009"),
             border: c("#0000000f"), text: c("#000000e4"), subtext: c("#0000009e"), muted: c("#00000072"),
             accent: c("#005fb8"), accent_alt: c("#003e92"), on_accent: c("#ffffff"),
-            success: c("#0f7b0f"), warning: c("#9d5d00"), error: c("#c42b1c"), shadow: c("#00000024"), term: term(CAMPBELL),
+            success: c("#0f7b0f"), warning: c("#9d5d00"), error: c("#c42b1c"), shadow: c("#00000024"), term: term(CAMPBELL), m3: None,
         },
         ("windows10", true) => Palette {
             scheme, bg: c("#101010"), surface: c("#1f1f1f"), surface_alt: c("#2b2b2b"), overlay: c("#ffffff1a"),
             border: c("#ffffff1a"), text: c("#ffffff"), subtext: c("#ffffffb3"), muted: c("#ffffff80"),
             accent: c("#0078d7"), accent_alt: c("#429ce3"), on_accent: c("#ffffff"),
-            success: c("#16c60c"), warning: c("#ffb900"), error: c("#e81123"), shadow: c("#00000080"), term: term(CAMPBELL),
+            success: c("#16c60c"), warning: c("#ffb900"), error: c("#e81123"), shadow: c("#00000080"), term: term(CAMPBELL), m3: None,
         },
         ("windows10", false) => Palette {
             scheme, bg: c("#f0f0f0"), surface: c("#e4e4e4"), surface_alt: c("#ffffff"), overlay: c("#0000001a"),
             border: c("#0000001a"), text: c("#000000"), subtext: c("#000000b3"), muted: c("#00000080"),
             accent: c("#0078d7"), accent_alt: c("#005a9e"), on_accent: c("#ffffff"),
-            success: c("#107c10"), warning: c("#9d5d00"), error: c("#e81123"), shadow: c("#00000040"), term: term(CAMPBELL),
+            success: c("#107c10"), warning: c("#9d5d00"), error: c("#e81123"), shadow: c("#00000040"), term: term(CAMPBELL), m3: None,
         },
         ("macos", true) => Palette {
             scheme, bg: c("#1e1e1e"), surface: c("#282828"), surface_alt: c("#323232"), overlay: c("#ffffff1a"),
             border: c("#ffffff1a"), text: c("#ffffffd9"), subtext: c("#ffffff8c"), muted: c("#ffffff40"),
             accent: c("#0a84ff"), accent_alt: c("#409cff"), on_accent: c("#ffffff"),
-            success: c("#32d74b"), warning: c("#ffd60a"), error: c("#ff453a"), shadow: c("#00000059"), term: term(MAC_TERMINAL),
+            success: c("#32d74b"), warning: c("#ffd60a"), error: c("#ff453a"), shadow: c("#00000059"), term: term(MAC_TERMINAL), m3: None,
         },
         ("macos", false) => Palette {
             scheme, bg: c("#ececec"), surface: c("#f6f6f6"), surface_alt: c("#ffffff"), overlay: c("#0000000d"),
             border: c("#0000001a"), text: c("#000000d9"), subtext: c("#00000080"), muted: c("#00000040"),
             accent: c("#007aff"), accent_alt: c("#0064d1"), on_accent: c("#ffffff"),
-            success: c("#34c759"), warning: c("#ffcc00"), error: c("#ff3b30"), shadow: c("#00000033"), term: term(MAC_TERMINAL),
+            success: c("#34c759"), warning: c("#ffcc00"), error: c("#ff3b30"), shadow: c("#00000033"), term: term(MAC_TERMINAL), m3: None,
         },
         ("aqua", _) => Palette {
             scheme, bg: c("#e8e8e8"), surface: c("#ededed"), surface_alt: c("#ffffff"), overlay: c("#0000000f"),
             border: c("#00000033"), text: c("#000000"), subtext: c("#000000a6"), muted: c("#00000066"),
             accent: c("#3875d7"), accent_alt: c("#6fa0e8"), on_accent: c("#ffffff"),
-            success: c("#28a745"), warning: c("#f5a623"), error: c("#e0443e"), shadow: c("#00000059"), term: term(MAC_TERMINAL),
+            success: c("#28a745"), warning: c("#f5a623"), error: c("#e0443e"), shadow: c("#00000059"), term: term(MAC_TERMINAL), m3: None,
         },
         _ => return None,
     };
@@ -185,7 +284,18 @@ pub fn system(name: &str, scheme: Scheme) -> Option<Palette> {
 }
 
 impl Palette {
+    /// Creed's palettes: tinted seeds use Material 3's TonalSpot scheme (the same algorithm and
+    /// roles as Android / matugen); neutral and fixed-accent seeds use the OKLCH tone ramp.
     pub fn generate(seed: Seed, scheme: Scheme, high_contrast: bool, accent_override: Option<Color>) -> Palette {
+        let base = Self::generate_oklch(seed, scheme, high_contrast, accent_override);
+        if seed.fixed_accent.is_some() || seed.tint < 0.5 || seed.accent_chroma <= 0.0 {
+            return base;
+        }
+        let source = accent_override.unwrap_or_else(|| Color::from_oklch(0.62, seed.accent_chroma.max(0.1), seed.hue));
+        material(base, source, scheme == Scheme::Dark, high_contrast, accent_override.is_some())
+    }
+
+    fn generate_oklch(seed: Seed, scheme: Scheme, high_contrast: bool, accent_override: Option<Color>) -> Palette {
         let dark = scheme == Scheme::Dark;
         let h = seed.hue;
         let t = seed.tint.clamp(0.0, 1.0);
@@ -264,6 +374,7 @@ impl Palette {
             error: sem(25.0),
             shadow: Color::rgba(0.0, 0.0, 0.0, if dark { 0.45 } else { 0.18 }),
             term,
+            m3: None,
         }
     }
 
