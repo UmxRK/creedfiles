@@ -1456,11 +1456,10 @@ pub fn aqua_dashboard(ui: &mut Ui, t_open: f64, data: &Data, views: &mut Views) 
     ui.cr.rectangle(0.0, 0.0, sw, sh);
     ui.cr.set_source_rgba(0.0, 0.0, 0.0, 0.45 * t_open.clamp(0.0, 1.0));
     let _ = ui.cr.fill();
-    let scale = 0.92 + 0.08 * t_open.clamp(0.0, 1.0);
+    // Widgets drift in by whole pixels: scaling the context would make cairo cache glyphs at
+    // every fractional size the animation passes through (unbounded memory).
     ui.cr.save().ok();
-    ui.cr.translate(sw / 2.0, sh / 2.0);
-    ui.cr.scale(scale, scale);
-    ui.cr.translate(-sw / 2.0, -sh / 2.0);
+    ui.cr.translate(0.0, ((1.0 - t_open.clamp(0.0, 1.0)) * 24.0).round());
     let cx = sw / 2.0;
     let cy = sh * 0.42;
     // Clock: a black glossy face.

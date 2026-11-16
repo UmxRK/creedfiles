@@ -36,7 +36,7 @@ stage "Creed Settings: every page, edits persist, welcome flow"
 su tester -c tests/settings.sh || fail "settings app"
 
 stage "Screen reader: every control reaches AT-SPI with a name, in every mode"
-for d in modes/*/; do m=$(basename "$d"); su tester -c "tests/a11y.sh $m" | grep -E "✗" && fail "a11y $m"; done
+for d in modes/*/; do m=$(basename "$d"); out=$(su tester -c "tests/a11y.sh $m" 2>&1) || { echo "$out" | grep -E "✗"; fail "a11y $m"; }; done
 echo "  all modes ok"
 
 stage "SDDM login themes render with the real greeter"

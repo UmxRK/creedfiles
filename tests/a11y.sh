@@ -20,7 +20,7 @@ echo $! > /tmp/creed-test/shell.pid
 for i in $(seq 50); do [ -S $XDG_RUNTIME_DIR/creed/shell.sock ] && break; sleep 0.1; done
 sleep 1.5
 $S cmd "open control" >/dev/null; sleep 1.5
-python3 - <<'PY'
+A11Y_MODE=${1:-creed} python3 - <<'PY'
 import gi, sys
 gi.require_version("Atspi", "2.0")
 from gi.repository import Atspi
@@ -49,7 +49,12 @@ ok = len(inter) >= 10 and not unnamed
 print(("✓" if ok else "✗") + f" every interactive control has a real name ({len(unnamed)} missing: {unnamed[:4]})")
 names = " ".join(n for _, n in inter).lower()
 # Names every mode must announce (Windows says "Do not disturb", macOS says "Focus").
-for label, alts in (("Wi-Fi / Network", ["wi-fi", "network"]), ("Bluetooth", ["bluetooth"]), ("Do Not Disturb / Focus", ["do not disturb", "focus"]), ("Clock or calendar", ["clock", "calendar"])):
+import os
+need = [("Wi-Fi / Network / AirPort", ["wi-fi", "network", "airport"]), ("Clock or calendar", ["clock", "calendar"])]
+if os.environ.get("A11Y_MODE") != "mac-aqua":
+    # Tiger had no Do Not Disturb, and shows Bluetooth only when an adapter exists.
+    need += [("Bluetooth", ["bluetooth"]), ("Do Not Disturb / Focus", ["do not disturb", "focus"])]
+for label, alts in need:
     hit = any(a in names for a in alts)
     print(("✓" if hit else "✗") + f" '{label}' is announced"); ok = ok and hit
 sys.exit(0 if ok else 1)
