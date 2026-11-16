@@ -50,6 +50,7 @@ TWEAKS (everything is explained before it runs)
   tweak recommended             Tweaks recommended for this hardware
 
 SYSTEM
+  plugins build|status          Window titlebar plugin (hyprbars) for your Hyprland
   hardware [--json]             Detected GPU / CPU / laptop / RAM
   doctor                        Check the installation
   ram                           Memory used by Creed right now
@@ -77,6 +78,10 @@ pub fn shell_ipc(cmd: &str) -> Result<String, String> {
         return Err(e.to_string());
     }
     Ok(out)
+}
+
+pub fn shell_quote_path(p: &std::path::Path) -> String {
+    format!("'{}'", p.display().to_string().replace('\'', "'\\''"))
 }
 
 pub fn ask(question: &str) -> bool {
@@ -236,6 +241,25 @@ fn run(args: &[String]) -> Result<(), String> {
                 Ok(())
             }
             other => Err(format!("unknown config command '{other}'")),
+        },
+        "plugins" => match a(1) {
+            "build" => {
+                let st = std::process::Command::new("bash").arg(apply::build_script()).status().map_err(|e| e.to_string())?;
+                if !st.success() {
+                    return Err("building hyprbars failed".into());
+                }
+                if let Ok(c) = load(None) {
+                    apply::ensure_titlebars(&c);
+                }
+                Ok(())
+            }
+            "status" | "" => {
+                let (built, fresh, loaded) = apply::plugin_status();
+                println!("hyprbars: built={built} matches-installed-hyprland={fresh} loaded={loaded}");
+                println!("location: {}", apply::plugin_dir().join("hyprbars.so").display());
+                Ok(())
+            }
+            other => Err(format!("unknown plugins command '{other}' (build|status)")),
         },
         "tweak" => tweaks::run(&args[1..]),
         "tweak-root" => tweaks::run_root(&args[1..]),

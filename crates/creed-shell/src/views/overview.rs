@@ -44,6 +44,27 @@ pub fn draw(ui: &mut Ui, closing: bool, data: &Data, views: &mut Views) {
     ui.cr.restore().ok();
 }
 
+/// Paints a live preview (cover-fit, rounded) if one was captured; returns whether it did.
+pub fn draw_thumb(ui: &mut Ui, data: &Data, addr: &str, r: Rect, radius: f64) -> bool {
+    let Some(img) = data.thumbs.get(addr) else { return false };
+    let (iw, ih) = (img.width() as f64, img.height() as f64);
+    if iw < 1.0 || ih < 1.0 || r.w < 2.0 || r.h < 2.0 {
+        return false;
+    }
+    let k = (r.w / iw).max(r.h / ih);
+    let cr = ui.cr;
+    cr.save().ok();
+    gfx::rounded(cr, r, radius);
+    cr.clip();
+    cr.translate(r.cx() - iw * k / 2.0, r.cy() - ih * k / 2.0);
+    cr.scale(k, k);
+    let _ = cr.set_source_surface(img, 0.0, 0.0);
+    cr.source().set_filter(cairo::Filter::Good);
+    let _ = cr.paint();
+    cr.restore().ok();
+    true
+}
+
 fn window_card(ui: &mut Ui, r: Rect, c: &Client, data: &Data, selected: bool, idx: usize) {
     let th = ui.th;
     let k = ui::idn("ov.win", &c.address);
@@ -60,7 +81,9 @@ fn window_card(ui: &mut Ui, r: Rect, c: &Client, data: &Data, selected: bool, id
     // Body: large app icon on a tinted field (live thumbnails need compositor capture).
     let field = body.inset(6.0);
     gfx::fill_rounded(ui.cr, field, th.radius_small(), th.pal.surface_alt);
-    ui.icon(field, &icon, (field.h.min(field.w) * 0.42).min(96.0).round(), None);
+    if !draw_thumb(ui, data, &c.address, field, th.radius_small()) {
+        ui.icon(field, &icon, (field.h.min(field.w) * 0.42).min(96.0).round(), None);
+    }
     if selected || hv > 0.0 {
         gfx::stroke_rounded(ui.cr, r.inset(-2.0), th.radius_small() + 6.0, 2.5, th.pal.accent.with_alpha(if selected { 1.0 } else { hv }));
     }
@@ -195,7 +218,9 @@ fn workspace_map(ui: &mut Ui, data: &Data, views: &mut Views) {
                 gfx::stroke_rounded(ui.cr, wr, th.radius_small(), 2.0, th.pal.accent.with_alpha(if selected { 1.0 } else { whv }));
             }
             let icon = icon_for_class(&data.apps, &c.class);
-            ui.icon(wr, &icon, (wr.w.min(wr.h) * 0.4).clamp(12.0, 64.0).round(), None);
+            if !draw_thumb(ui, data, &c.address, wr, th.radius_small()) {
+                ui.icon(wr, &icon, (wr.w.min(wr.h) * 0.4).clamp(12.0, 64.0).round(), None);
+            }
             let hit = ui.hit(wk, wr, Action::FocusWindow(c.address.clone()), Role::Item, format!("{}: {}", Data::pretty_class(&c.class), c.title));
             hit.secondary = Some(Action::CloseWindow(c.address.clone()));
         }

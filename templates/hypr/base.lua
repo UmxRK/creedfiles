@@ -87,6 +87,10 @@ hl.window_rule({ name = "creed-games-immediate", match = { class = "^(steam_app_
 hl.window_rule({ name = "creed-float-all", match = { class = ".*" }, float = true, center = true })
 {{/?}}
 
+------------------------------ titlebars -------------------------------
+-- Needs the hyprbars plugin (built by `creed plugins build`, loaded at login).
+{{ hypr.titlebars }}
+
 ------------------------------ autostart -------------------------------
 hl.on("hyprland.start", function()
     hl.exec_cmd("creed-shell")

@@ -325,15 +325,18 @@ Layout:
 
 ## Known limits
 
-- **Overview window previews.** The overview shows each window's app icon and title, not a
-  live preview. Live previews need a capture protocol that couldn't be tested in this build
-  environment.
-- **macOS-style menu bar.** It shows the focused app's name plus a window menu. App menus
-  are not exported: most Wayland apps don't publish them.
-- **No titlebar buttons.** Windows have no minimise / maximise / close buttons yet. In
-  Windows and Mac modes those actions are on the usual shortcuts and in the window menu
-  (click the app name in the Mac menu bar, or press Super+Z). Titlebars would need the
-  `hyprbars` plugin, which could not be built or tested here.
+- **Titlebars need a plugin build.** The Windows (– ▢ ✕) and macOS (traffic light)
+  titlebars use the official `hyprbars` plugin. Creed compiles it for your exact Hyprland
+  version (`creed plugins build`, also done by the installer) and rebuilds it automatically
+  at login after a Hyprland update. Until the plugin has been built, windows have no
+  titlebar; the config never breaks either way.
+- **macOS menus are generic.** The menu bar shows the focused app's name with real File,
+  Edit, View, Window and Help menus. Their items send the standard shortcuts (Copy, Save,
+  Undo, Zoom and so on) to that app. Apps' own custom menus can't be shown: Hyprland has no
+  protocol for exporting them.
+- **Live previews need Hyprland.** The overview and Task View show live window previews
+  through Hyprland's toplevel-export protocol. On other compositors they fall back to app
+  icons.
 
 ## Licence
 

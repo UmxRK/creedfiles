@@ -235,6 +235,7 @@ fn entries_from(children: &[OwnedValue], depth: usize, out: &mut Vec<MenuEntry>)
         let label = s("label").unwrap_or_default();
         let has_kids = !kids.is_empty() && s("children-display").as_deref() == Some("submenu");
         out.push(MenuEntry {
+            accel: String::new(),
             id,
             label: format!("{}{}", "   ".repeat(depth), label),
             enabled: b("enabled").unwrap_or(true) && !has_kids,

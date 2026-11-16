@@ -85,6 +85,8 @@ pub struct TrayItem {
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct MenuEntry {
     pub id: i32,
+    /// Keyboard shortcut shown on the right (app menus only).
+    pub accel: String,
     pub label: String,
     pub enabled: bool,
     pub separator: bool,
@@ -158,6 +160,8 @@ pub struct Data {
     pub apps: Vec<AppEntry>,
     /// Recently used files (path, display name, when) from recently-used.xbel.
     pub recent: Vec<(String, String, String)>,
+    /// Live window previews (address → small image), only while the overview is open.
+    pub thumbs: std::collections::HashMap<String, cairo::ImageSurface>,
     pub clips: Vec<(String, String)>,
     pub sys: SysStat,
     pub weather: Option<WeatherNow>,
@@ -170,6 +174,15 @@ pub struct Data {
 }
 
 impl Data {
+    /// Windows that belong on a taskbar/dock: normal workspaces plus minimised ones.
+    pub fn is_app_window(c: &Client) -> bool {
+        !c.class.is_empty() && (c.workspace.id > 0 || c.workspace.name == "special:minimized")
+    }
+
+    pub fn is_minimized(&self, addr: &str) -> bool {
+        self.clients.iter().any(|c| c.address == addr && c.workspace.name == "special:minimized")
+    }
+
     pub fn active_client(&self) -> Option<&Client> {
         self.clients.iter().find(|c| c.address == self.active_addr)
     }

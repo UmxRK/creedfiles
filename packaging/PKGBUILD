@@ -6,7 +6,7 @@ pkgdesc="Creed: a light, mode-switching Hyprland desktop (Creed, Windows 10/11, 
 arch=('x86_64' 'aarch64')
 url="https://github.com/UmxRK/creedfiles"
 license=('GPL-3.0-or-later')
-depends=('hyprland>=0.57' 'hyprlock' 'hypridle' 'xdg-desktop-portal-hyprland' 'xdg-desktop-portal-gtk'
+depends=('base-devel' 'jq' 'hyprland>=0.57' 'hyprlock' 'hypridle' 'xdg-desktop-portal-hyprland' 'xdg-desktop-portal-gtk'
          'qt5-wayland' 'qt6-wayland' 'qt6ct' 'polkit' 'wireplumber' 'pipewire-pulse' 'libpulse'
          'networkmanager' 'bluez-utils' 'brightnessctl' 'playerctl' 'power-profiles-daemon'
          'grim' 'slurp' 'wl-clipboard' 'cliphist' 'libnotify' 'curl'
@@ -59,7 +59,7 @@ package() {
   install -Dm644 packaging/creed-settings.desktop "$pkgdir/usr/share/applications/creed-settings.desktop"
   install -Dm644 packaging/creed.svg "$pkgdir/usr/share/icons/hicolor/scalable/apps/creed-settings.svg"
   install -d "$pkgdir/usr/share/creed" "$pkgdir/usr/share/icons"
-  cp -r modes templates tweaks defaults.toml "$pkgdir/usr/share/creed/"
+  cp -r modes templates tweaks scripts defaults.toml "$pkgdir/usr/share/creed/"
   cp -r icons/Creed-Fluent "$pkgdir/usr/share/icons/"
   chmod -R u=rwX,go=rX "$pkgdir/usr/share/creed" "$pkgdir/usr/share/icons/Creed-Fluent"
   for t in sddm/*/; do

@@ -123,6 +123,7 @@ pub fn apply(mode: Option<&str>, reload: bool) -> Result<(), String> {
             let _ = h.request(&format!("setcursor {} {}", cfg.style.cursor_theme, cfg.style.cursor_size));
         }
         let _ = crate::shell_ipc("reload");
+        ensure_titlebars(&cfg);
         export_lock_wallpaper(&paths);
         sddm_follow(&cfg.general.mode);
     }
@@ -152,6 +153,9 @@ pub fn session_start() -> Result<(), String> {
     if pending.exists() && have("creed-settings") {
         let _ = fs::remove_file(&pending);
         let _ = Command::new("creed-settings").arg("--welcome").stdin(Stdio::null()).stdout(Stdio::null()).stderr(Stdio::null()).spawn();
+    }
+    if let Ok(l) = Config::load(&paths, None) {
+        ensure_titlebars(&l.config);
     }
     // Wait for the shell, then export the lock-screen wallpaper.
     for _ in 0..50 {
@@ -240,4 +244,60 @@ pub fn screenshot(kind: &str) -> Result<(), String> {
     }
     let _ = Command::new("notify-send").args(["-a", "Screenshot", "-i", &file, "Screenshot saved", &format!("Copied to clipboard · {file}")]).status();
     Ok(())
+}
+
+// ───────────────────────────── titlebar plugin ─────────────────────────────
+
+pub fn plugin_dir() -> PathBuf {
+    let base = std::env::var_os("XDG_DATA_HOME").map(PathBuf::from).unwrap_or_else(|| PathBuf::from(std::env::var("HOME").unwrap_or_default()).join(".local/share"));
+    base.join("creed/plugins")
+}
+
+/// ABI hash of the Hyprland binary on disk.
+fn installed_abi() -> Option<String> {
+    let out = Command::new("Hyprland").arg("--version-json").output().ok()?;
+    let v: serde_json::Value = serde_json::from_slice(&out.stdout).ok()?;
+    v.get("abiHash")?.as_str().map(str::to_string)
+}
+
+pub fn plugin_status() -> (bool, bool, bool) {
+    let so = plugin_dir().join("hyprbars.so");
+    let built = so.is_file();
+    let fresh = built && fs::read_to_string(plugin_dir().join("hyprbars.abi")).map(|s| Some(s.trim().to_string()) == installed_abi()).unwrap_or(false);
+    let loaded = Hypr::from_env().and_then(|h| h.request("plugin list").ok()).map(|s| s.contains("hyprbars")).unwrap_or(false);
+    (built, fresh, loaded)
+}
+
+pub fn build_script() -> PathBuf {
+    Paths::from_env().data.join("scripts/build-hyprbars.sh")
+}
+
+/// Makes sure titlebars are available when the mode wants them: loads the plugin into the
+/// running Hyprland, or rebuilds it in the background first if Hyprland was updated.
+pub fn ensure_titlebars(cfg: &Config) {
+    if cfg.style.titlebar == creed_core::config::Titlebar::None {
+        return;
+    }
+    let Some(h) = Hypr::from_env() else { return };
+    let (built, fresh, loaded) = plugin_status();
+    if loaded {
+        return;
+    }
+    let so = plugin_dir().join("hyprbars.so");
+    if built && fresh {
+        let _ = h.request(&format!("plugin load {}", so.display()));
+        let _ = h.request("reload");
+        return;
+    }
+    // Build in the background (takes ~20 s), then load and reload.
+    let script = build_script();
+    if !script.is_file() {
+        return;
+    }
+    let cmd = format!(
+        "notify-send -a Creed -i preferences-desktop 'Preparing window titlebars' 'Building the titlebar plugin for your Hyprland version…'; bash {} && hyprctl plugin load {} && hyprctl reload || notify-send -a Creed -u critical 'Titlebars unavailable' 'Building the hyprbars plugin failed. Run: creed plugins build'",
+        crate::shell_quote_path(&script),
+        crate::shell_quote_path(&so)
+    );
+    let _ = Command::new("setsid").args(["-f", "sh", "-c", &cmd]).stdin(Stdio::null()).stdout(Stdio::null()).stderr(Stdio::null()).spawn();
 }

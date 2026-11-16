@@ -19,6 +19,9 @@ install -m755 target/release/creed-shell /usr/local/bin/creed-shell
 stage "Every mode + variant validates with Hyprland --verify-config"
 su tester -c tests/verify-modes.sh || fail "hyprland configs"
 
+stage "Every shell dispatcher is accepted by Hyprland"
+su tester -c tests/dispatchers.sh || fail "dispatchers"
+
 stage "Tweaks: apply → re-apply → status → revert (byte-identical), cleanup safety"
 tests/tweaks.sh | tail -25 || fail "tweaks"
 

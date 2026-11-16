@@ -100,7 +100,7 @@ hardware_summary() {
 }
 
 # ───────────── packages ─────────────
-PKGS_CORE=(hyprland hyprlock hypridle xdg-desktop-portal-hyprland xdg-desktop-portal-gtk
+PKGS_CORE=(base-devel hyprland hyprlock hypridle xdg-desktop-portal-hyprland xdg-desktop-portal-gtk
   qt5-wayland qt6-wayland qt6ct polkit wireplumber pipewire pipewire-pulse libpulse
   networkmanager bluez bluez-utils brightnessctl playerctl power-profiles-daemon
   grim slurp wl-clipboard cliphist libnotify jq curl git rust gum
@@ -161,7 +161,7 @@ install_files() {
   sudo_run install -Dm644 "$SRC/packaging/creed.svg" "$PREFIX/share/icons/hicolor/scalable/apps/creed-settings.svg"
   sudo_run rm -rf "$D.new"
   sudo_run install -d "$D.new"
-  sudo_run cp -r "$SRC/modes" "$SRC/templates" "$SRC/tweaks" "$SRC/defaults.toml" "$D.new/"
+  sudo_run cp -r "$SRC/modes" "$SRC/templates" "$SRC/tweaks" "$SRC/scripts" "$SRC/defaults.toml" "$D.new/"
   sudo_run rm -rf /usr/share/icons/Creed-Fluent
   sudo_run cp -r "$SRC/icons/Creed-Fluent" /usr/share/icons/Creed-Fluent
   sudo_run chmod -R u=rwX,go=rX /usr/share/icons/Creed-Fluent
@@ -208,6 +208,16 @@ fetch_assets() {
     fi
   done
   rm -rf "$tmp"
+}
+
+# ───────────── titlebar plugin ─────────────
+build_titlebars() {
+  say "Window titlebars"
+  info "Windows and macOS modes draw real titlebars (– ▢ ✕ / traffic lights) with the"
+  info "hyprbars plugin, compiled for your exact Hyprland version (about 20 seconds)."
+  if [ "$DRY" = 1 ]; then echo "  [dry-run] bash $PREFIX/share/creed/scripts/build-hyprbars.sh"; return 0; fi
+  if spin "Building hyprbars" bash "$PREFIX/share/creed/scripts/build-hyprbars.sh"; then ok "Titlebars ready"
+  else warn "Could not build hyprbars now - Creed retries automatically at login (see $LOG)"; fi
 }
 
 # ───────────── tweaks ─────────────
@@ -301,12 +311,14 @@ main() {
   build
   install_files
   if [ "$UPDATE" = 1 ]; then
+    build_titlebars
     creed theme apply >> "$LOG" 2>&1 || true
     creed reload >/dev/null 2>&1 || true
     say "Creed updated."
     exit 0
   fi
   fetch_assets
+  build_titlebars
   user_setup
   choose_tweaks
   setup_sddm

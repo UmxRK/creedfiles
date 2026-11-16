@@ -240,6 +240,88 @@ pub fn autostart_block(have: &dyn Fn(&str) -> bool) -> String {
     v.join("\n")
 }
 
+/// hyprbars (titlebar plugin) configuration for the mode. Everything is guarded by
+/// `if hl.plugin.hyprbars` so the config stays valid when the plugin is not loaded.
+pub fn titlebar_block(cfg: &Config, pal: &Palette) -> String {
+    let tb = cfg.style.titlebar;
+    if tb == Titlebar::None {
+        return "if hl.plugin.hyprbars then\n    hl.config({ plugin = { hyprbars = { enabled = false } } })\nend".into();
+    }
+    let dark = pal.scheme == Scheme::Dark;
+    let font = cfg.font().replace('"', "");
+    let close = "hyprctl dispatch 'hl.dsp.window.close()'";
+    let maximize = "hyprctl dispatch 'hl.dsp.window.fullscreen({ mode = \"maximized\", action = \"toggle\" })'";
+    let minimize = "hyprctl dispatch 'hl.dsp.window.move({ workspace = \"special:minimized\" })'";
+    let (opts, buttons): (Vec<String>, Vec<(String, String, u32, &str, &str)>) = match tb {
+        Titlebar::Windows => {
+            // Windows 11 caption bar: 32 px, title left in 12 px Segoe/Selawik, glyph buttons right.
+            let fg = pal.text.to_hypr();
+            (
+                vec![
+                    "bar_height = 32".into(),
+                    format!("bar_color = \"{}\"", pal.bg.to_hypr()),
+                    format!("[\"col.text\"] = \"{}\"", pal.text.to_hypr()),
+                    format!("bar_text_font = \"{font}\""),
+                    "bar_text_size = 9".into(),
+                    "bar_text_align = \"left\"".into(),
+                    "bar_buttons_alignment = \"right\"".into(),
+                    "bar_padding = 16".into(),
+                    "bar_button_padding = 30".into(),
+                    "bar_blur = true".into(),
+                    "bar_part_of_window = true".into(),
+                    "bar_precedence_over_border = true".into(),
+                    "icon_on_hover = false".into(),
+                    format!("inactive_button_color = \"{}\"", Color::rgba(0.0, 0.0, 0.0, 0.0).to_hypr()),
+                ],
+                // Order: first button sits at the right edge.
+                vec![
+                    ("rgba(00000000)".into(), fg.clone(), 16, "✕", close),
+                    ("rgba(00000000)".into(), fg.clone(), 16, "▢", maximize),
+                    ("rgba(00000000)".into(), fg, 16, "—", minimize),
+                ],
+            )
+        }
+        Titlebar::Mac | Titlebar::None => {
+            // macOS: 28 px title bar, centred title, traffic lights on the left (12 px, 8 px apart).
+            let glyph = "rgba(0000008c)".to_string();
+            (
+                vec![
+                    "bar_height = 28".into(),
+                    format!("bar_color = \"{}\"", if dark { pal.surface.to_hypr() } else { pal.surface_alt.to_hypr() }),
+                    format!("[\"col.text\"] = \"{}\"", pal.subtext.to_hypr()),
+                    format!("bar_text_font = \"{font}\""),
+                    "bar_text_size = 10".into(),
+                    "bar_text_weight = \"semibold\"".into(),
+                    "bar_text_align = \"center\"".into(),
+                    "bar_buttons_alignment = \"left\"".into(),
+                    "bar_padding = 9".into(),
+                    "bar_button_padding = 8".into(),
+                    "bar_blur = true".into(),
+                    "bar_part_of_window = true".into(),
+                    "bar_precedence_over_border = true".into(),
+                    "icon_on_hover = true".into(),
+                    format!("inactive_button_color = \"{}\"", if dark { "rgba(5a5a5aff)" } else { "rgba(d1d1d1ff)" }),
+                ],
+                vec![
+                    ("rgba(ff5f57ff)".into(), glyph.clone(), 12, "×", close),
+                    ("rgba(febc2eff)".into(), glyph.clone(), 12, "−", minimize),
+                    ("rgba(28c840ff)".into(), glyph, 12, "+", maximize),
+                ],
+            )
+        }
+    };
+    let mut s = String::from("if hl.plugin.hyprbars then\n    hl.config({ plugin = { hyprbars = {\n        enabled = true,\n");
+    for o in opts {
+        s.push_str(&format!("        {o},\n"));
+    }
+    s.push_str(&format!("        on_double_click = [[{maximize}]],\n    }} }} }})\n"));
+    for (bg, fg, size, icon, action) in buttons {
+        s.push_str(&format!("    hl.plugin.hyprbars.add_button({{ bg_color = \"{bg}\", fg_color = \"{fg}\", size = {size}, icon = \"{icon}\", action = [[{action}]] }})\n"));
+    }
+    s.push_str("end");
+    s
+}
+
 /// All template variables.
 pub fn vars(paths: &Paths, cfg: &Config, pal: &Palette, hw: &Hardware, have: &dyn Fn(&str) -> bool) -> Vars {
     let mut v = pal.vars();
@@ -298,6 +380,7 @@ pub fn vars(paths: &Paths, cfg: &Config, pal: &Palette, hw: &Hardware, have: &dy
     put("hypr.animations", animations_block(cfg, &fam));
     put("hypr.env", env_block(cfg, hw));
     put("hypr.autostart", autostart_block(have));
+    put("hypr.titlebars", titlebar_block(cfg, pal));
     put("glass.layers", (quality(cfg, hw) != Quality::Off).to_string());
     put("hw.tearing", "false".into());
     put("hw.vrr", "2".into());
@@ -425,6 +508,20 @@ mod tests {
         assert!(b.contains("variant = 8") && b.contains("bulb = 24"), "{b}");
         cfg.glass.enabled = false;
         assert!(blur_block(&cfg, &hw_strong, &pal).contains("enabled = false"));
+    }
+
+    #[test]
+    fn titlebars() {
+        let pal = Palette::generate(palette::preset_seed("macos").unwrap(), Scheme::Dark, false, None);
+        let mut cfg = Config::default();
+        assert!(titlebar_block(&cfg, &pal).contains("enabled = false"));
+        cfg.style.titlebar = Titlebar::Mac;
+        let b = titlebar_block(&cfg, &pal);
+        assert!(b.starts_with("if hl.plugin.hyprbars then") && b.ends_with("end"));
+        assert!(b.contains("bar_buttons_alignment = \"left\"") && b.contains("ff5f57"));
+        assert_eq!(b.matches("add_button").count(), 3);
+        cfg.style.titlebar = Titlebar::Windows;
+        assert!(titlebar_block(&cfg, &pal).contains("bar_buttons_alignment = \"right\""));
     }
 
     #[test]

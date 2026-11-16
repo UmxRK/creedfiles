@@ -304,6 +304,8 @@ pub fn doctor() -> Result<(), String> {
     for (cmd, pkg) in [("wpctl", "wireplumber"), ("nmcli", "networkmanager"), ("grim", "grim"), ("slurp", "slurp"), ("wl-copy", "wl-clipboard"), ("cliphist", "cliphist"), ("hyprlock", "hyprlock"), ("hypridle", "hypridle"), ("brightnessctl", "brightnessctl"), ("playerctl", "playerctl"), ("notify-send", "libnotify")] {
         check(which(cmd), &format!("{cmd} available"), &format!("sudo pacman -S {pkg}"));
     }
+    let (built, fresh, _) = crate::apply::plugin_status();
+    check(built && fresh, "titlebar plugin (hyprbars) built for this Hyprland", "creed plugins build");
     let fonts = Command::new("fc-list").arg(":family").output().map(|o| String::from_utf8_lossy(&o.stdout).to_string()).unwrap_or_default();
     check(fonts.contains("Inter"), "Inter font", "sudo pacman -S inter-font");
     check(Path::new("/usr/lib/creed/creed-helper").exists(), "system tweak helper installed", "re-run ./install.sh (needs sudo once)");

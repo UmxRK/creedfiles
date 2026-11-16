@@ -420,6 +420,7 @@ version = "0.1.0"
 dependencies = [
  "accesskit",
  "accesskit_unix",
+ "bitflags",
  "cairo-rs",
  "creed-core",
  "image",
@@ -431,8 +432,10 @@ dependencies = [
  "serde_json",
  "smithay-client-toolkit",
  "toml 0.8.23",
+ "wayland-backend",
  "wayland-client",
  "wayland-protocols",
+ "wayland-scanner",
  "zbus",
 ]
 

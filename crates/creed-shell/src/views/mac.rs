@@ -263,7 +263,8 @@ pub fn module_len(ui: &mut Ui, name: &str, data: &Data) -> Option<f64> {
         "launcher" => 34.0,
         "appmenu" => {
             let app = data.active_client().map(|c| Data::pretty_class(&c.class)).unwrap_or_else(|| "Finder".into());
-            ui.measure(&app, &Text::new(fs, col).bold()).0 + 20.0 + ui.measure("Window", &Text::new(fs, col)).0 + 20.0
+            let titles: f64 = MENU_TITLES.iter().map(|t| ui.measure(t, &Text::new(fs, col)).0 + 20.0).sum();
+            ui.measure(&app, &Text::new(fs, col).bold()).0 + 20.0 + titles
         }
         "window" => 0.0,
         "battery" => {
@@ -310,12 +311,17 @@ pub fn draw_module(ui: &mut Ui, name: &str, r: Rect, data: &Data) -> bool {
             let ar = Rect::new(r.x, r.y, aw, r.h);
             item_hover(ui, &mm, ar, key);
             ui.text(ar, &app, &Text::new(fs, col).bold().center());
-            ui.hit(key, ar, Action::Toggle(Kind::Snap), Role::Button, format!("{app} menu"));
-            let wk = ui::id("mac.windowmenu");
-            let wr = Rect::new(ar.right(), r.y, r.w - aw, r.h);
-            item_hover(ui, &mm, wr, wk);
-            ui.text(wr, "Window", &Text::new(fs, col).center());
-            ui.hit(wk, wr, Action::Toggle(Kind::Snap), Role::Button, "Window menu");
+            ui.hit(key, ar, Action::AppMenu("app".into(), ar.x as i32), Role::Button, format!("{app} menu"));
+            let mut x = ar.right();
+            for t in MENU_TITLES {
+                let tw = ui.measure(t, &Text::new(fs, col)).0 + 20.0;
+                let tr = Rect::new(x, r.y, tw, r.h);
+                let tk = ui::idn("mac.menutitle", t);
+                item_hover(ui, &mm, tr, tk);
+                ui.text(tr, t, &Text::new(fs, col).center());
+                ui.hit(tk, tr, Action::AppMenu(t.to_string(), tr.x as i32), Role::Button, format!("{t} menu"));
+                x += tw;
+            }
         }
         "battery" => {
             let Some(b) = &data.battery else { return true };
@@ -735,5 +741,150 @@ pub fn osd(ui: &mut Ui, kind: crate::data::OsdKind, value: f64) {
     match kind {
         crate::data::OsdKind::Brightness => big_slider(ui, &mm, sr, v, &|cr, c, col| glyph_sun(cr, c, 14.0, col)),
         _ => big_slider(ui, &mm, sr, v, &|cr, c, col| glyph_speaker(cr, c, 13.0, col, 1.0, false)),
+    }
+}
+
+// ───────────────────────────── app menus ─────────────────────────────
+
+pub const MENU_TITLES: &[&str] = &["File", "Edit", "View", "Window", "Help"];
+
+fn shortcut(mods: &str, key: &str) -> Action {
+    Action::Hypr(format!("hl.dsp.send_shortcut({{ mods = \"{mods}\", key = \"{key}\" }})"))
+}
+
+/// (label, accelerator text, action). `None` action = separator; `Some(Action::None)` = disabled.
+fn items(title: &str, app: &str) -> Vec<(String, &'static str, Option<Action>)> {
+    let s = |l: &str, acc: &'static str, a: Action| (l.to_string(), acc, Some(a));
+    let sep = || (String::new(), "", None);
+    match title {
+        "app" => vec![
+            s(&format!("About {app}"), "", Action::None),
+            sep(),
+            s("Settings…", "⌃,", shortcut("CTRL", "comma")),
+            sep(),
+            s(&format!("Hide {app}"), "⌘H", Action::Hypr("hl.dsp.window.move({ workspace = \"special:hidden\" })".into())),
+            s(&format!("Quit {app}"), "⌘Q", Action::Hypr("hl.dsp.window.close()".into())),
+        ],
+        "File" => vec![
+            s("New Window", "⌃N", shortcut("CTRL", "N")),
+            s("New Tab", "⌃T", shortcut("CTRL", "T")),
+            s("Open…", "⌃O", shortcut("CTRL", "O")),
+            sep(),
+            s("Save", "⌃S", shortcut("CTRL", "S")),
+            s("Save As…", "⇧⌃S", shortcut("CTRL SHIFT", "S")),
+            sep(),
+            s("Print…", "⌃P", shortcut("CTRL", "P")),
+            s("Close Window", "⌘W", Action::Hypr("hl.dsp.window.close()".into())),
+        ],
+        "Edit" => vec![
+            s("Undo", "⌃Z", shortcut("CTRL", "Z")),
+            s("Redo", "⇧⌃Z", shortcut("CTRL SHIFT", "Z")),
+            sep(),
+            s("Cut", "⌃X", shortcut("CTRL", "X")),
+            s("Copy", "⌃C", shortcut("CTRL", "C")),
+            s("Paste", "⌃V", shortcut("CTRL", "V")),
+            s("Select All", "⌃A", shortcut("CTRL", "A")),
+            sep(),
+            s("Find…", "⌃F", shortcut("CTRL", "F")),
+            s("Clipboard History", "⌘V", Action::Toggle(Kind::Clipboard)),
+            s("Emoji & Symbols", "⌘.", Action::Toggle(Kind::Emoji)),
+        ],
+        "View" => vec![
+            s("Enter Full Screen", "⌃⌘F", Action::Hypr("hl.dsp.window.fullscreen({ mode = \"fullscreen\" })".into())),
+            sep(),
+            s("Zoom In", "⌃+", shortcut("CTRL", "plus")),
+            s("Zoom Out", "⌃−", shortcut("CTRL", "minus")),
+            s("Actual Size", "⌃0", shortcut("CTRL", "0")),
+            sep(),
+            s("Reload", "⌃R", shortcut("CTRL", "R")),
+        ],
+        "Window" => vec![
+            s("Minimise", "⌘M", Action::Hypr("hl.dsp.window.move({ workspace = \"special:minimized\" })".into())),
+            s("Zoom", "", Action::Hypr("hl.dsp.window.fullscreen({ mode = \"maximized\", action = \"toggle\" })".into())),
+            s("Move & Resize…", "⌘Z", Action::Open(Kind::Snap)),
+            sep(),
+            s("Centre Window", "", Action::Hypr("hl.dsp.window.center()".into())),
+            s("Float on Top", "", Action::Hypr("hl.dsp.window.pin()".into())),
+            sep(),
+            s("Mission Control", "⌃↑", Action::Toggle(Kind::Overview)),
+        ],
+        _ => vec![
+            s("Creed Help", "", Action::Exec("xdg-open https://github.com/UmxRK/creedfiles#readme".into())),
+            s("Keyboard Shortcuts", "", Action::Exec("creed-settings --page desktop".into())),
+        ],
+    }
+}
+
+pub fn menu_entries(title: &str, app: &str) -> Vec<crate::data::MenuEntry> {
+    items(title, app)
+        .into_iter()
+        .enumerate()
+        .map(|(i, (label, accel, a))| crate::data::MenuEntry {
+            id: i as i32,
+            accel: accel.to_string(),
+            label,
+            enabled: matches!(&a, Some(x) if *x != Action::None),
+            separator: a.is_none(),
+            toggle: None,
+        })
+        .collect()
+}
+
+pub fn menu_action(title: &str, id: i32) -> Option<Action> {
+    items(title, "").into_iter().nth(id.max(0) as usize).and_then(|(_, _, a)| a).filter(|a| *a != Action::None)
+}
+
+/// All dispatcher strings the menus can send (validated against Hyprland in tests).
+pub fn menu_dispatches() -> Vec<String> {
+    let mut v = vec![];
+    for t in ["app", "File", "Edit", "View", "Window", "Help"] {
+        for (_, _, a) in items(t, "X") {
+            if let Some(Action::Hypr(s)) = a {
+                v.push(s);
+            }
+        }
+    }
+    v
+}
+
+/// The open app menu, styled like an NSMenu: 6 px radius, 22 px rows, accelerators right.
+pub fn draw_app_menu(ui: &mut Ui, t_open: f64, data: &Data, x: f64) {
+    let mm = m(ui);
+    let bar = if ui.th.cfg.bar.enabled { (ui.th.cfg.bar.size + ui.th.cfg.bar.margin) as f64 } else { 0.0 };
+    let row = 22.0;
+    let entries = &data.menu;
+    let w = entries
+        .iter()
+        .map(|e| ui.measure(&e.label, &Text::new(13.0, mm.label)).0 + ui.measure(&e.accel, &Text::new(13.0, mm.label)).0 + 64.0)
+        .fold(220.0, f64::max);
+    let h = entries.iter().map(|e| if e.separator { 11.0 } else { row }).sum::<f64>() + 10.0;
+    let (sw, _) = ui.size;
+    let r = Rect::new(x.min(sw - w - 4.0).max(4.0).round(), bar + 2.0, w.round(), h);
+    super::popup_transform(ui, r, t_open, true);
+    panel(ui, &mm, r, if mm.tahoe { 12.0 } else { 6.0 }, "menu");
+    ui.record("menu.panel", r, None);
+    ui.hit(ui::id("menu.panel"), r, Action::None, Role::Group, "");
+    let mut y = r.y + 5.0;
+    for e in entries {
+        if e.separator {
+            gfx::fill_rounded(ui.cr, Rect::new(r.x + 10.0, y + 5.0, r.w - 20.0, 1.0), 0.0, mm.stroke);
+            y += 11.0;
+            continue;
+        }
+        let rr = Rect::new(r.x + 5.0, y, r.w - 10.0, row);
+        let k = ui::idn("mac.menu", e.id);
+        let hv = if e.enabled { ui.hover_amt(k) } else { 0.0 };
+        if hv > 0.5 {
+            gfx::fill_rounded(ui.cr, rr, 4.0, mm.accent);
+        }
+        let fg = if !e.enabled { mm.label3 } else if hv > 0.5 { Color::WHITE } else { mm.label };
+        ui.text(Rect::new(rr.x + 14.0, rr.y, rr.w - 80.0, rr.h), &e.label, &Text::new(13.0, fg));
+        if !e.accel.is_empty() {
+            ui.text(Rect::new(rr.right() - 70.0, rr.y, 60.0, rr.h), &e.accel, &Text::new(13.0, if hv > 0.5 { Color::WHITE } else { mm.label2 }).end());
+        }
+        if e.enabled {
+            ui.hit(k, rr, Action::MenuItem(e.id), Role::Item, e.label.clone());
+        }
+        y += row;
     }
 }

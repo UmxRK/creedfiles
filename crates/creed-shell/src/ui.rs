@@ -136,6 +136,8 @@ pub enum Action {
     TrayActivate(String),
     TrayMenu(String),
     MenuItem(i32),
+    /// Open a macOS-style app menu (title, x position of its title in the bar).
+    AppMenu(String, i32),
     ClipboardPick(String),
     EmojiPick(String),
     LauncherPick(usize),

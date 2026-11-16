@@ -21,7 +21,7 @@ fn item_count(th: &gfx::Theme, data: &Data) -> usize {
     let pinned: Vec<String> = th.cfg.dock.pinned.iter().map(|p| p.to_lowercase()).collect();
     let mut seen: Vec<String> = vec![];
     if th.cfg.dock.show_running {
-        for c in data.clients.iter().filter(|c| c.workspace.id > 0 && !c.class.is_empty()) {
+        for c in data.clients.iter().filter(|c| Data::is_app_window(c)) {
             let cl = c.class.to_lowercase();
             if !pinned.iter().any(|p| *p == cl || p.ends_with(&format!(".{cl}")) || cl.ends_with(&format!(".{p}"))) && !seen.contains(&cl) {
                 seen.push(cl);

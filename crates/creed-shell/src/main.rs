@@ -6,6 +6,7 @@ mod data;
 mod gfx;
 mod icons;
 mod services;
+mod thumbs;
 mod time;
 mod ui;
 mod views;
@@ -32,6 +33,21 @@ fn main() {
     let args: Vec<String> = std::env::args().collect();
     if args.iter().any(|a| a == "--version" || a == "-V") {
         println!("creed-shell {}", env!("CARGO_PKG_VERSION"));
+        return;
+    }
+    if args.iter().any(|a| a == "--print-dispatches") {
+        // Test hook: every Hyprland dispatcher the shell can send, one per line.
+        let mut all = views::snap::sample_dispatches();
+        all.extend(views::mac::menu_dispatches());
+        all.push("hl.dsp.focus({ workspace = 3 })".into());
+        all.push("hl.dsp.focus({ workspace = \"e-1\" })".into());
+        all.push("hl.dsp.focus({ workspace = \"empty\" })".into());
+        all.push("hl.dsp.window.move({ workspace = 2, window = \"address:0x1\" })".into());
+        all.push("hl.dsp.window.move({ workspace = \"special:minimized\", window = \"address:0x1\" })".into());
+        all.push("hl.dsp.exec_cmd(\"hyprctl switchxkblayout all next\")".into());
+        for d in all {
+            println!("{d}");
+        }
         return;
     }
     if args.iter().any(|a| a == "--help" || a == "-h") {

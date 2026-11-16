@@ -130,6 +130,8 @@ pub struct App {
     pub fractional_mgr: Option<WpFractionalScaleManagerV1>,
     pub viewporter: Option<WpViewporter>,
     pub text_input_mgr: Option<ZwpTextInputManagerV3>,
+    pub toplevel_export: Option<crate::thumbs::protocol::hyprland_toplevel_export_manager_v1::HyprlandToplevelExportManagerV1>,
+    pub captures: Vec<crate::thumbs::Pending>,
     pub text_input: Option<ZwpTextInputV3>,
     pub ime_pending: (Option<String>, Option<String>),
     pub keyboard: Option<wl_keyboard::WlKeyboard>,
@@ -226,6 +228,7 @@ impl App {
         let fractional_mgr = globals.bind::<WpFractionalScaleManagerV1, _, _>(&qh, 1..=1, ()).ok();
         let viewporter = globals.bind::<WpViewporter, _, _>(&qh, 1..=1, ()).ok();
         let text_input_mgr = globals.bind::<ZwpTextInputManagerV3, _, _>(&qh, 1..=1, ()).ok();
+        let toplevel_export = globals.bind::<crate::thumbs::protocol::hyprland_toplevel_export_manager_v1::HyprlandToplevelExportManagerV1, _, _>(&qh, 1..=1, ()).ok();
         let (theme, config_error) = load_theme(&paths);
         let icons = Icons::new(&theme.cfg.style.icon_theme);
         let mut data = Data::default();
@@ -246,6 +249,8 @@ impl App {
             fractional_mgr,
             viewporter,
             text_input_mgr,
+            toplevel_export,
+            captures: vec![],
             text_input: None,
             ime_pending: (None, None),
             keyboard: None,
@@ -371,6 +376,12 @@ impl App {
             }
             drop(s);
             let _ = self.conn.flush();
+        }
+        if !self.surfs.iter().any(|s| s.kind == Kind::Overview) {
+            self.data.thumbs.clear();
+            for p in self.captures.drain(..) {
+                p.frame.destroy();
+            }
         }
         if !self.surfs.iter().any(|s| s.kind.is_popup()) {
             // Popups are gone: give memory back.
@@ -707,6 +718,9 @@ impl App {
             self.views.snap_target = self.data.active_addr.clone();
         }
         self.views.on_open(kind, &mut self.data);
+        if kind == Kind::Overview && !self.views.overview_launchpad {
+            self.capture_windows();
+        }
         if matches!(kind, Kind::Dashboard) {
             self.data.uptime = uptime();
         }
@@ -742,6 +756,20 @@ impl App {
         }
         self.mark(Kind::Bar);
         self.mark(Kind::Dock);
+    }
+
+    /// Requests a fresh preview of every window (Hyprland only).
+    fn capture_windows(&mut self) {
+        let Some(mgr) = self.toplevel_export.clone() else { return };
+        let addrs: Vec<String> = self.data.clients.iter().filter(|c| c.mapped && c.workspace.id > 0).take(24).map(|c| c.address.clone()).collect();
+        for addr in addrs {
+            if self.captures.iter().any(|p| p.addr == addr) {
+                continue;
+            }
+            let Some(handle) = crate::thumbs::handle_of(&addr) else { continue };
+            let frame = mgr.capture_toplevel(0, handle, &self.qh, ());
+            self.captures.push(crate::thumbs::Pending { addr, frame, format: None, flags: 0, pool: None, buffer: None });
+        }
     }
 
     pub fn toggle(&mut self, kind: Kind) {
@@ -799,7 +827,13 @@ impl App {
             }
             Action::Hypr(lua) => self.hypr_dispatch(&lua),
             Action::FocusWindow(addr) => {
-                self.hypr_dispatch(&format!("hl.dsp.focus({{ window = {} }})", lua_str(&format!("address:{addr}"))));
+                let win = lua_str(&format!("address:{addr}"));
+                if self.data.is_minimized(&addr) {
+                    // Restore a minimised window onto the current workspace first.
+                    let ws = if self.data.active_ws > 0 { self.data.active_ws } else { 1 };
+                    self.hypr_dispatch(&format!("hl.dsp.window.move({{ workspace = {ws}, window = {win} }})"));
+                }
+                self.hypr_dispatch(&format!("hl.dsp.focus({{ window = {win} }})"));
                 self.close_popups();
             }
             Action::CloseWindow(addr) => {
@@ -869,7 +903,25 @@ impl App {
                 self.mark_all();
             }
             Action::TrayActivate(key) => services::tray::activate(&key, false),
+            Action::AppMenu(title, x) => {
+                let same = self.is_open(Kind::Menu) && self.views.app_menu.as_ref().map(|(t, _)| t == &title).unwrap_or(false);
+                if same {
+                    self.close(Kind::Menu);
+                } else {
+                    let app = self.data.active_client().map(|c| Data::pretty_class(&c.class)).unwrap_or_else(|| "Finder".into());
+                    self.data.menu = views::mac::menu_entries(&title, &app);
+                    self.data.menu_owner = String::new();
+                    self.close(Kind::Menu);
+                    let uids: Vec<u64> = self.surfs.iter().filter(|s| s.kind == Kind::Menu).map(|s| s.uid).collect();
+                    for u in uids {
+                        self.destroy(u);
+                    }
+                    self.open(Kind::Menu);
+                    self.views.app_menu = Some((title, x as f64));
+                }
+            }
             Action::TrayMenu(key) => {
+                self.views.app_menu = None;
                 if let Some(item) = self.data.tray.iter().find(|t| t.key == key).cloned() {
                     if item.menu.is_some() {
                         self.data.menu_owner = key.clone();
@@ -882,6 +934,13 @@ impl App {
                 }
             }
             Action::MenuItem(id) => {
+                if let Some((title, _)) = self.views.app_menu.clone() {
+                    self.close(Kind::Menu);
+                    if let Some(a) = views::mac::menu_action(&title, id) {
+                        self.perform(a);
+                    }
+                    return;
+                }
                 if let Some(item) = self.data.tray.iter().find(|t| t.key == self.data.menu_owner).cloned() {
                     services::tray::menu_event(&item, id);
                 }

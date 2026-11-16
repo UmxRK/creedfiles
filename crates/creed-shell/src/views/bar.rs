@@ -258,7 +258,7 @@ pub fn taskbar_items(ui: &mut Ui, data: &Data) -> Vec<(String, String, Vec<Strin
         let icon = data.apps.iter().find(|a| &a.id == p).map(|a| a.icon.clone()).unwrap_or_else(|| p.clone());
         items.push((p.clone(), icon, vec![]));
     }
-    for c in data.clients.iter().filter(|c| c.workspace.id > 0 && !c.class.is_empty()) {
+    for c in data.clients.iter().filter(|c| Data::is_app_window(c)) {
         let class_l = c.class.to_lowercase();
         let pos = items.iter().position(|(id, _, _)| {
             let idl = id.to_lowercase();

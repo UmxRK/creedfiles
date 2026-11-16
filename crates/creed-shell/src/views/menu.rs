@@ -5,9 +5,18 @@ use crate::data::Data;
 use crate::gfx::{self, Rect, Text};
 use crate::ui::{self, Action, Kind, Role, Ui};
 
-pub fn draw(ui: &mut Ui, closing: bool, data: &Data, _views: &mut Views) {
+pub fn draw(ui: &mut Ui, closing: bool, data: &Data, views: &mut Views) {
     let t = open_amount(ui, closing);
     ui.backdrop(Action::Close(Kind::Menu));
+    if let Some((_, x)) = views.app_menu.clone() {
+        ui.cr.save().ok();
+        ui.cr.push_group();
+        super::mac::draw_app_menu(ui, t, data, x);
+        let _ = ui.cr.pop_group_to_source();
+        let _ = ui.cr.paint_with_alpha(t.clamp(0.0, 1.0));
+        ui.cr.restore().ok();
+        return;
+    }
     let th = ui.th;
     let row_h = 32.0;
     let entries = &data.menu;

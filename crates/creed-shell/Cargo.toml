@@ -11,6 +11,9 @@ serde_json.workspace = true
 toml.workspace = true
 smithay-client-toolkit = { version = "0.21", default-features = false, features = ["calloop", "xkbcommon"] }
 wayland-client = "0.31"
+wayland-scanner = "0.31"
+wayland-backend = "0.3"
+bitflags = "2"
 wayland-protocols = { version = "0.32", features = ["client", "staging", "unstable"] }
 cairo-rs = { version = "0.22", default-features = false, features = ["png"] }
 pango = "0.22"

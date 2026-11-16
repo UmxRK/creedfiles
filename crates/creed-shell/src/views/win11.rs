@@ -653,7 +653,9 @@ pub fn task_view(ui: &mut Ui, data: &Data, views: &mut Views) {
         ui.text(Rect::new(title.x + 26.0, title.y, title.w - 60.0, title.h), &c.title, &Text::new(CAPTION, Color::rgba(1.0, 1.0, 1.0, 0.95)));
         gfx::shadow(ui.cr, r, OVERLAY_RADIUS, 16.0, 6.0, 0.45);
         gfx::fill_rounded(ui.cr, r, OVERLAY_RADIUS, t.solid_base);
-        ui.icon(r, &icon, (r.h * 0.35).clamp(32.0, 96.0).round(), None);
+        if !super::overview::draw_thumb(ui, data, &c.address, r, OVERLAY_RADIUS) {
+            ui.icon(r, &icon, (r.h * 0.35).clamp(32.0, 96.0).round(), None);
+        }
         if hv > 0.0 || i == sel {
             gfx::stroke_rounded(ui.cr, r.inset(-3.0), OVERLAY_RADIUS + 3.0, 3.0, Color::rgba(1.0, 1.0, 1.0, if i == sel { 0.95 } else { 0.6 * hv }));
         }

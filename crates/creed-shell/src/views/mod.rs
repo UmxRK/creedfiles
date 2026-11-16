@@ -74,10 +74,15 @@ pub struct Views {
     pub wifi_password_for: Option<String>,
     pub password: String,
     pub overview_launchpad: bool,
+    /// Open macOS app menu: (menu title, x of its title in the bar).
+    pub app_menu: Option<(String, f64)>,
 }
 
 impl Views {
     pub fn on_open(&mut self, kind: Kind, data: &mut Data) {
+        if kind != Kind::Menu {
+            self.app_menu = None;
+        }
         if kind != Kind::Overview {
             self.overview_launchpad = false;
         }
