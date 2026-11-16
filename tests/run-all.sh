@@ -25,6 +25,9 @@ su tester -c tests/apps.sh || fail "app themes"
 stage "CLI: every command, bad input and config round trips"
 su tester -c tests/cli.sh || fail "cli"
 
+stage "Creed Settings: every page, edits persist, welcome flow"
+su tester -c tests/settings.sh || fail "settings app"
+
 stage "Every shell dispatcher is accepted by Hyprland"
 su tester -c tests/dispatchers.sh || fail "dispatchers"
 

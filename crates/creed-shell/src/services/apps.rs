@@ -267,12 +267,16 @@ mod tests {
         assert_eq!(clean_exec("firefox %u --x 100%% %F"), "firefox --x 100%");
         assert_eq!(parse_iso("1970-01-02T00:00:10Z"), Some(86410));
         assert_eq!(parse_iso("2026-11-16T12:00:00.123Z"), Some(1794830400));
-        let f = std::env::temp_dir().join("creed recent test.txt");
+        // Per-process directory: a fixed /tmp path breaks when another user created it first.
+        let dir = std::env::temp_dir().join(format!("creed-recent-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let f = dir.join("creed recent test.txt");
         std::fs::write(&f, "x").unwrap();
         let xml = format!("<xbel><bookmark href=\"file://{}\" modified=\"2026-11-16T10:00:00Z\"/><bookmark href=\"file:///nope/missing.txt\" modified=\"2026-11-16T11:00:00Z\"/></xbel>", f.display().to_string().replace(' ', "%20"));
         let r = parse_recent(&xml, 1794830400);
         assert_eq!(r.len(), 1);
         assert_eq!(r[0].1, "creed recent test.txt");
         assert_eq!(r[0].2, "2h ago");
+        let _ = std::fs::remove_dir_all(&dir);
     }
 }

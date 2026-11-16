@@ -1,5 +1,7 @@
 // Creed login screen for SDDM (Qt 6). One file, three layouts chosen by theme.conf:
-// layout=creed (centred card), windows (time bottom-left, sign-in centre), macos (time on top).
+// layout=creed (centred card), windows (Windows 11 lock: time centred on top, sign-in centre),
+// macos (macOS 26: date over a large clock on top, user and password pill at the bottom).
+// `background` in theme.conf points at a bundled drawn wallpaper (Creed's own artwork).
 import QtQuick 2.15
 import QtQuick.Shapes 1.15
 
@@ -19,6 +21,7 @@ Rectangle {
     }
 
     Image {
+        id: wallpaper
         anchors.fill: parent
         source: config.background || ""
         fillMode: Image.PreserveAspectCrop
@@ -27,7 +30,7 @@ Rectangle {
     }
     // Soft glows (radial gradients, so the theme works without any image).
     Repeater {
-        model: [[0.78, 0.25, 0.45, config.glow1 || "#e8905a"], [0.2, 0.78, 0.42, config.glow2 || "#c25a6c"]]
+        model: wallpaper.status === Image.Ready ? [] : [[0.78, 0.25, 0.45, config.glow1 || "#e8905a"], [0.2, 0.78, 0.42, config.glow2 || "#c25a6c"]]
         Shape {
             anchors.fill: parent
             preferredRendererType: Shape.CurveRenderer
@@ -49,7 +52,7 @@ Rectangle {
             }
         }
     }
-    Rectangle { anchors.fill: parent; color: "#000000"; opacity: root.layout === "windows" ? 0.25 : 0.18 }
+    Rectangle { anchors.fill: parent; color: "#000000"; opacity: root.layout === "macos" ? 0.0 : (root.layout === "windows" ? 0.15 : 0.22) }
 
     Connections {
         target: sddm
@@ -69,40 +72,58 @@ Rectangle {
         id: clock
         property date now: new Date()
         spacing: 4
-        anchors.horizontalCenter: root.layout === "windows" ? undefined : parent.horizontalCenter
-        anchors.left: root.layout === "windows" ? parent.left : undefined
-        anchors.leftMargin: 64
-        anchors.top: root.layout === "macos" ? parent.top : undefined
-        anchors.topMargin: 90
-        anchors.bottom: root.layout === "windows" ? parent.bottom : (root.layout === "creed" ? card.top : undefined)
-        anchors.bottomMargin: root.layout === "windows" ? 110 : 36
+        anchors.horizontalCenter: parent.horizontalCenter
+        anchors.top: root.layout === "creed" ? undefined : parent.top
+        anchors.topMargin: root.layout === "macos" ? 70 : 120
+        anchors.bottom: root.layout === "creed" ? card.top : undefined
+        anchors.bottomMargin: 36
+        // macOS puts the date above the clock.
         Text {
+            visible: root.layout === "macos"
+            text: Qt.formatDate(clock.now, "ddd d MMMM")
+            color: root.fg; opacity: 0.9
+            font.family: root.fontFamily; font.pixelSize: 24; font.weight: Font.DemiBold
+            anchors.horizontalCenter: parent.horizontalCenter
+        }
+        Item {
+            width: timeText.implicitWidth; height: timeText.implicitHeight
+            anchors.horizontalCenter: parent.horizontalCenter
+            // Soft shadow so a translucent clock stays readable over bright wallpapers.
+            Text {
+                x: 0; y: 2
+                text: timeText.text; font: timeText.font
+                color: "#000000"; opacity: root.layout === "creed" ? 0.0 : 0.12
+            }
+        Text {
+            id: timeText
             text: Qt.formatTime(clock.now, "hh:mm")
-            color: root.fg; font.family: root.fontFamily
-            font.pixelSize: root.layout === "creed" ? 120 : 132
-            font.weight: root.layout === "windows" ? Font.Light : Font.Bold
-            anchors.horizontalCenter: root.layout === "windows" ? undefined : parent.horizontalCenter
+            color: root.fg; opacity: root.layout === "macos" ? 0.92 : 1.0
+            font.family: root.fontFamily
+            font.pixelSize: root.layout === "creed" ? 120 : (root.layout === "macos" ? 150 : 140)
+            font.weight: root.layout === "windows" ? Font.DemiBold : Font.Bold
+        }
         }
         Text {
+            visible: root.layout !== "macos"
             text: Qt.formatDate(clock.now, "dddd, d MMMM")
             color: root.layout === "creed" ? root.accent : root.fg
-            font.family: root.fontFamily; font.pixelSize: root.layout === "windows" ? 30 : 24
-            anchors.horizontalCenter: root.layout === "windows" ? undefined : parent.horizontalCenter
+            font.family: root.fontFamily; font.pixelSize: root.layout === "windows" ? 26 : 24
+            anchors.horizontalCenter: parent.horizontalCenter
         }
     }
 
     // Sign-in card
     Rectangle {
         id: card
-        width: 380; height: inner.implicitHeight + 48
+        width: root.layout === "macos" ? 260 : 380; height: inner.implicitHeight + 48
         radius: root.layout === "windows" ? 8 : 26
         color: root.layout === "creed" ? "#2a2220" : "transparent"
         opacity: 0.96
         anchors.horizontalCenter: parent.horizontalCenter
         anchors.verticalCenter: root.layout === "macos" ? undefined : parent.verticalCenter
-        anchors.verticalCenterOffset: root.layout === "creed" ? 90 : 40
+        anchors.verticalCenterOffset: root.layout === "creed" ? 90 : 120
         anchors.bottom: root.layout === "macos" ? parent.bottom : undefined
-        anchors.bottomMargin: 110
+        anchors.bottomMargin: 70
 
         Column {
             id: inner
@@ -111,20 +132,22 @@ Rectangle {
             spacing: 14
 
             Rectangle {
-                width: 84; height: 84; radius: 42
-                color: root.accent
+                width: root.layout === "macos" ? 64 : (root.layout === "windows" ? 150 : 84)
+                height: width; radius: width / 2
+                color: root.layout === "creed" ? root.accent : Qt.rgba(1, 1, 1, root.layout === "macos" ? 0.3 : 0.22)
+                border.color: root.layout === "macos" ? Qt.rgba(1, 1, 1, 0.6) : "transparent"; border.width: 1
                 anchors.horizontalCenter: parent.horizontalCenter
                 Text {
                     anchors.centerIn: parent
                     text: (userField.text || "?").charAt(0).toUpperCase()
-                    color: "#ffffff"; font.pixelSize: 38; font.bold: true; font.family: root.fontFamily
+                    color: "#ffffff"; font.pixelSize: parent.width * 0.45; font.bold: true; font.family: root.fontFamily
                 }
             }
             TextInput {
                 id: userField
                 width: parent.width
                 text: userModel.lastUser
-                color: root.fg; font.family: root.fontFamily; font.pixelSize: 20; font.weight: Font.DemiBold
+                color: root.fg; font.family: root.fontFamily; font.pixelSize: root.layout === "windows" ? 28 : (root.layout === "macos" ? 15 : 20); font.weight: Font.DemiBold
                 horizontalAlignment: TextInput.AlignHCenter
                 KeyNavigation.tab: password
                 Accessible.name: "User name"
@@ -136,17 +159,27 @@ Rectangle {
                 }
             }
             Item {
-                width: parent.width; height: 46
+                width: root.layout === "macos" ? 220 : parent.width
+                height: root.layout === "macos" ? 36 : (root.layout === "windows" ? 40 : 46)
+                anchors.horizontalCenter: parent.horizontalCenter
                 Rectangle {
                     anchors.fill: parent
-                    radius: root.layout === "windows" ? 4 : 23
-                    color: "#ffffff"; opacity: 0.14
+                    radius: root.layout === "windows" ? 4 : height / 2
+                    color: "#ffffff"; opacity: root.layout === "macos" ? 0.24 : 0.14
+                    border.color: root.layout === "macos" ? "#ffffff" : "transparent"; border.width: 1
+                }
+                // Windows: accent underline on the focused box.
+                Rectangle {
+                    visible: root.layout === "windows"
+                    anchors.left: parent.left; anchors.right: parent.right; anchors.bottom: parent.bottom
+                    height: password.activeFocus ? 2 : 1; radius: 1
+                    color: password.activeFocus ? root.accent : Qt.rgba(1, 1, 1, 0.5)
                 }
                 Rectangle {
                     anchors.fill: parent
                     radius: root.layout === "windows" ? 4 : 23
                     color: "transparent"
-                    border.color: password.activeFocus ? root.accent : "transparent"; border.width: 2
+                    border.color: password.activeFocus && root.layout === "creed" ? root.accent : "transparent"; border.width: 2
                 }
                 TextInput {
                     id: password
@@ -165,7 +198,7 @@ Rectangle {
                     anchors.centerIn: parent
                     visible: !password.text && !password.activeFocus
                     text: root.layout === "windows" ? "PIN or password" : "Enter Password"
-                    color: root.fg; opacity: 0.55; font.family: root.fontFamily; font.pixelSize: 16
+                    color: root.fg; opacity: 0.6; font.family: root.fontFamily; font.pixelSize: root.layout === "macos" ? 13 : 16
                 }
             }
             Text {
