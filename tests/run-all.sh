@@ -13,7 +13,8 @@ cargo test --release --workspace >/dev/null 2>&1 || fail "unit tests"
 
 stage "Lint: clippy (warnings are errors), shellcheck, pyflakes"
 cargo clippy --release --workspace --all-targets -- -D warnings >/dev/null 2>&1 || fail "clippy"
-shellcheck -S warning -s bash install.sh helper/creed-helper scripts/*.sh tweaks/lib.sh tweaks/*/*/{apply,revert,plan,status} 2>/dev/null >/tmp/creed-shellcheck.txt || { cat /tmp/creed-shellcheck.txt | head -20; fail "shellcheck"; }
+mapfile -t sh_files < <(ls install.sh helper/creed-helper scripts/*.sh tweaks/lib.sh; find tweaks -mindepth 3 -maxdepth 3 -type f \( -name apply -o -name revert -o -name plan -o -name status \))
+shellcheck -S warning -s bash "${sh_files[@]}" >/tmp/creed-shellcheck.txt 2>&1 || { head -20 /tmp/creed-shellcheck.txt; fail "shellcheck"; }
 pyflakes settings/creed-settings tests/*.py || fail "pyflakes"
 echo "  clean"
 
