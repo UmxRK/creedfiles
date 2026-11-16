@@ -321,7 +321,14 @@ pub fn draw_module(ui: &mut Ui, name: &str, r: Rect, data: &Data) -> bool {
     match name {
         "launcher" => {
             item_hover(ui, &mm, r, key);
-            glyph_logo(ui.cr, (r.cx(), r.cy()), col);
+            // With the downloaded MacTahoe/WhiteSur theme installed, its own start-here glyph is
+            // used (that asset comes from the theme, not from Creed); otherwise a neutral mark.
+            let theme = ui.th.cfg.style.icon_theme.to_lowercase();
+            if (theme.starts_with("mactahoe") || theme.starts_with("whitesur")) && ui.icons.exists("start-here-symbolic") {
+                ui.icon(r, "start-here-symbolic", 16.0, Some(col));
+            } else {
+                glyph_logo(ui.cr, (r.cx(), r.cy()), col);
+            }
             ui.hit(key, r, Action::Toggle(Kind::Power), Role::Button, "System menu");
         }
         "appmenu" => {
