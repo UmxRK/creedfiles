@@ -329,6 +329,29 @@ elif V == 'details':
                   ('mac-aqua.hud', 1.2, 'HUD', None, 'P'), ('win10.tiles', 1.25, 'Tiles', None, 'L'), ('mac-tahoe.menu', 1.25, 'Menus', None, 'R'),
                   ('creed.calc', 1.25, 'Calculator', None, 'P'), ('win11', 1.3, 'Start', None, 'L'), ('mac-sequoia', 1.3, 'Control Center', None, 'R')], 15)
     outro(t, 'Sweat the small stuff.', C['mac-sequoia'][0], C['mac-sequoia'][1])
+elif V == 'game':
+    cols = ((.03, .015, .06), (.45, .08, .6), (.08, .45, .9)); acc = (.55, 1, .7)
+    nshot[0] += 1; bg(cols, 0, 7.6); cam_to(Vector((60, 0, 0)), 0, 7.6, 'S')
+    text('Game Mode.', .42, 0, 2.0, .05, 7.6); text('Everything steps aside for the game', .15, 0, 1.6, .35, 7.6, col=acc, font='SemiBold')
+    rows = [('Blur and shadows', 'off'), ('Animations', 'off'), ('Bar and dock', 'unloaded'), ('CPU governor', 'performance'), ('Tearing', 'allowed'), ('Starts', 'by itself')]
+    for i, (a, b) in enumerate(rows):
+        uicard(0, 1.0 - i * .47, 2.8, .4, (.07, .06, .1), .9 + i * .5, 7.6, [(a, .14, W, .18, 0, 'SemiBold'), (b, .13, acc, 1.75, 0, 'Bold')])
+    H['creed.game'] = ('creed', None, [('creed', '30-osd-game', (840, 44, 240, 72), 2.5, (0, -1, 0))])
+    t = seq(7.6, [('creed.game', 2.2, 'One key.', 'or automatic when a game opens', 'P')], 15)
+    nshot[0] += 1; bg(cols, t, 12.6); cam_to(Vector((nshot[0] * 60, 0, 0)), t, 12.6, 'S')
+    text('More frames.\nLess lag.', .42, 0, .7, t + .05, 12.6); text('Measure it yourself: MangoHud is built in', .13, 0, -.2, t + .45, 12.6, col=acc, font='SemiBold')
+    outro(12.6, 'Built for play.', cols, acc)
+elif V == 'stats':
+    segs = [('creed', lambda u: f'{int(28 * u)} MB', 'of RAM, with everything on screen'), ('win11', lambda u: f'{int(100 - 100 * u)}%', 'CPU when idle'),
+            ('mac-tahoe', lambda u: f'{0.9 - 0.75 * u:.2f} s', 'to open any panel'), ('mac-sequoia', lambda u: f'{1 + int(6 * u)}', 'looks in one install'),
+            ('win10', lambda u: f'{int(26 * u)}', 'tweaks, each explained first'), ('mac-bigsur', lambda u: f'{9 - int(8 * u)}', 'command to switch looks')]
+    for i, (pal, fn, cap) in enumerate(segs):
+        t0, t1 = i * 2.05, (i + 1) * 2.05; nshot[0] += 1; bg(C[pal][0], t0, t1); cam_to(Vector((nshot[0] * 60, 0, 0)), t0, t1, 'S')
+        n = text('0', .72 if i in (0, 2) else 1.15, 0, .7, t0 + .03, t1, font='ExtraBold', d=.35)
+        dyn.append((n, (lambda fn, t0, t1: lambda t: fn(min(max((t - t0) / .8, 0), 1) ** .5) if t0 - .1 <= t < t1 + .1 else None)(fn, t0, t1)))
+        text(cap, .17, 0, -.05, t0 + .5, t1, col=C[pal][1], font='SemiBold')
+        text(f'{i + 1} / 6', .1, 0, 2.05, t0 + .05, t1, col=(.7, .7, .76), font='Medium')
+    outro(12.3, 'The numbers are real.')
 else:
     raise SystemExit('unknown video ' + V)
 
@@ -336,7 +359,9 @@ anim(cam, 'location', sorted(camk, key=lambda k: k[0])); anim(aim, 'location', s
 
 def tick(scene, *_):
     t = (scene.frame_current - 1) / FPS
-    for o, fn in dyn: o.data.body = fn(t)
+    for o, fn in dyn:
+        b = fn(t)
+        if b is not None: o.data.body = b
 bpy.app.handlers.frame_change_pre.append(tick)
 
 d = f'{OUT}/{V}'; os.makedirs(d, exist_ok=True)

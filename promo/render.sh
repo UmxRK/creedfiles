@@ -3,7 +3,7 @@
 # Usage: promo/render.sh [video...]   Output: promo/videos/<video>.mp4 (1080x1920, 30 fps, 15 s)
 cd "$(dirname "$0")/.." || exit 1
 export LIBGL_ALWAYS_SOFTWARE=${LIBGL_ALWAYS_SOFTWARE:-1} PROMO_OUT=${PROMO_OUT:-promo/out}
-vids=("$@"); [ ${#vids[@]} -eq 0 ] && vids=(seven glass win11 material ram aqua command tweaks era details)
+vids=("$@"); [ ${#vids[@]} -eq 0 ] && vids=(seven glass win11 material ram aqua command tweaks era details game stats)
 for v in "${vids[@]}"; do
   echo "$(date +%T) render $v"
   blender -b --python promo/gen.py -- "$v" anim >"$PROMO_OUT.$v.log" 2>&1
