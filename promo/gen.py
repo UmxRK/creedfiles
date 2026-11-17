@@ -1,5 +1,5 @@
 """Creed promo videos, built and rendered in Blender (EEVEE).
-blender -b --python promo/gen.py -- <video> still <t,t,...> | anim   (frames -> $OUT/<video>/)
+blender -b --python promo/gen.py -- <video> still <t,t,...> | anim [from_s]   (frames -> $OUT/<video>/)
 Screens are real 2x captures from tests/out/<mode>-3840x2160 (tests/visual.sh <mode> 3840x2160 2)."""
 import bpy, bmesh, math, os, sys
 from mathutils import Vector
@@ -8,6 +8,7 @@ NAME, KIND = A[0], A[1]
 FPS, DUR = 30, 15.0
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 OUT = os.environ.get('PROMO_OUT', ROOT + '/promo/out')
+LINK = os.environ.get('PROMO_LINK', '1') != '0'   # 0: end card without the repo address
 SH = ROOT + '/tests/out/%s-3840x2160/%s.png'
 FD = '/usr/share/fonts/opentype/inter/InterDisplay-%s.otf'
 MONO = os.environ.get('PROMO_MONO', '/opt/arch/root.x86_64/usr/share/fonts/TTF/JetBrainsMono-Bold.ttf')
@@ -181,7 +182,8 @@ def outro(t0, line='Seven looks. One desktop.', cols=((.03, .02, .02), (.5, .2, 
     text('Creed', .86, 0, .75, t0 + .05, d=.5, font='ExtraBold')
     text(line, .2, 0, .02, t0 + .3, font='SemiBold')
     text('Free & open source  ·  Arch + Hyprland', .125, 0, -.38, t0 + .5, col=acc, font='Medium')
-    text('github.com/UmxRK/creedfiles', .12, 0, -.72, t0 + .7, col=(.62, .62, .68), font='Medium')
+    if LINK:
+        text('github.com/UmxRK/creedfiles', .12, 0, -.72, t0 + .7, col=(.62, .62, .68), font='Medium')
 
 # ── palettes and screen regions (1920×1080 logical px) ──
 C = {'creed': (((.07, .035, .02), (.62, .26, .13), (.4, .13, .22)), (1, .71, .58)),
@@ -370,5 +372,6 @@ if KIND == 'still':
     for t in A[2].split(','):
         S.frame_set(F(float(t))); S.render.filepath = f'{d}/still_{float(t):05.2f}.jpg'; bpy.ops.render.render(write_still=True)
 else:
+    if len(A) > 2: S.frame_start = F(float(A[2]))   # anim FROM: only render from that second on
     S.render.filepath = f'{d}/f_'; S.render.use_overwrite = False
     bpy.ops.render.render(animation=True)
